@@ -1,0 +1,6 @@
+{
+  "deepseek_api_key": "",
+  "model": "deepseek-chat",
+  "provider": "deepseek",
+  "allow_general": false
+}
