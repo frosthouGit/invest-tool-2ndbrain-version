@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三大表「顶部摘要 + 加粗高亮」样式预览</title>
+<style>
+  :root{
+    --bg:#fff; --bg2:#f4f6f8; --line:#e3e8ee; --ink:#1f2733; --muted:#5b6573;
+    --brand:#0d6efd; --brand2:#e8f1ff;
+  }
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg2);font-size:14px;line-height:1.5;}
+  header{padding:16px 22px;background:var(--bg);border-bottom:1px solid var(--line);font-weight:600;font-size:18px;}
+  .wrap{padding:20px 22px;max-width:1100px;margin:0 auto;}
+  .hint{background:#fff8ec;border:1px solid #f0d9a8;color:#8a5a00;border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:18px;}
+  .block{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:22px;}
+  .block h2{margin:0 0 4px;font-size:16px;}
+  .block .sub{color:var(--muted);font-size:12px;margin-bottom:12px;}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:800px){.cmp{grid-template-columns:1fr;}}
+  .cmp .col h3{font-size:13px;margin:0 0 8px;color:var(--muted);font-weight:600;}
+  table{border-collapse:collapse;width:100%;font-size:13px;}
+  th,td{border:1px solid var(--line);padding:6px 8px;}
+  thead th{background:var(--brand2);color:var(--brand);font-weight:600;}
+  td.rowname{background:#f7f8fa;font-weight:500;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .total-row td{font-weight:600;background:#e9f2fb;}
+  .total-row td.rowname{background:#dce9f7;}
+  .main-num{font-weight:700;}
+  .summary-card{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:auto;}
+  .summary-card .ttl{padding:8px 10px;background:var(--brand2);color:var(--brand);font-weight:600;font-size:13px;}
+  .tag{display:inline-block;font-size:11px;background:#e9f2fb;color:#0d6efd;border-radius:4px;padding:1px 6px;margin-left:6px;}
+  .legend{font-size:12px;color:var(--muted);margin-top:8px;}
+  .legend b{color:#0d6efd;}
+</style>
+</head>
+<body>
+<header>三大表「顶部摘要卡片 + 表内加粗浅蓝高亮」样式预览</header>
+<div class="wrap">
+
+  <div class="hint">
+    ⚠️ 说明：本页是 <b>样式示意</b>，数字均为占位/示意值，仅用于展示布局与高亮效果；真实数值以你本机重启工具后拉取的财报为准。<br>
+    🔧 改动已写入 <code>data.py</code> / <code>index.html</code>，<b>需重启 Flask</b>（<code>runtime/python/python.exe app.py</code>）后生效。<br>
+    📌 想增减某行高亮/摘要，把"科目名"告诉我即可，我直接改 <code>INCOME_TOP</code> / <code>CASH_TOP</code> 列表。
+  </div>
+
+  <!-- 利润表 -->
+  <div class="block">
+    <h2>利润表 <span class="tag">本次新增摘要+高亮</span></h2>
+    <div class="sub">顶部新增「主要合计（摘要）」卡片，重复列出关键总计/小计行；表内这些行整行加粗 + 浅蓝底。</div>
+    <div class="cmp">
+      <div class="col">
+        <h3>① 优化后 · 顶部摘要卡片</h3>
+        <div class="summary-card">
+          <div class="ttl">主要合计（摘要 · 详见下方明细）</div>
+          <table>
+            <thead><tr><th style="text-align:left">主要合计</th><th>2023</th><th>2024</th><th>2025</th></tr></thead>
+            <tbody>
+              <tr class="total-row"><td class="rowname">营业总收入</td><td class="num">2934亿</td><td class="num">3092亿</td><td class="num">3311亿</td></tr>
+              <tr class="total-row"><td class="rowname">营业总成本</td><td class="num">1120亿</td><td class="num">1180亿</td><td class="num">1240亿</td></tr>
+              <tr class="total-row"><td class="rowname">营业利润</td><td class="num">1640亿</td><td class="num">1740亿</td><td class="num">1860亿</td></tr>
+              <tr class="total-row"><td class="rowname">利润总额</td><td class="num">1642亿</td><td class="num">1742亿</td><td class="num">1862亿</td></tr>
+              <tr class="total-row"><td class="rowname">净利润</td><td class="num">1235亿</td><td class="num">1310亿</td><td class="num">1401亿</td></tr>
+              <tr class="total-row"><td class="rowname">归母净利润</td><td class="num">1202亿</td><td class="num">1276亿</td><td class="num">1365亿</td></tr>
+              <tr class="total-row"><td class="rowname">扣非归母净利润</td><td class="num">1200亿</td><td class="num">1273亿</td><td class="num">1360亿</td></tr>
+              <tr class="total-row"><td class="rowname">综合收益总额</td><td class="num">1238亿</td><td class="num">1312亿</td><td class="num">1405亿</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col">
+        <h3>② 优化后 · 明细表（加粗高亮行）</h3>
+        <table>
+          <thead><tr><th style="text-align:left">利润表科目</th><th>2023</th><th>2024</th><th>2025</th></tr></thead>
+          <tbody>
+            <tr><td class="rowname">营业收入</td><td class="num">2934亿</td><td class="num">3092亿</td><td class="num">3311亿</td></tr>
+            <tr><td class="rowname">营业成本</td><td class="num">1080亿</td><td class="num">1138亿</td><td class="num">1196亿</td></tr>
+            <tr><td class="rowname">税金及附加</td><td class="num">210亿</td><td class="num">222亿</td><td class="num">234亿</td></tr>
+            <tr><td class="rowname">销售费用</td><td class="num">45亿</td><td class="num">48亿</td><td class="num">51亿</td></tr>
+            <tr><td class="rowname">管理费用</td><td class="num">92亿</td><td class="num">98亿</td><td class="num">104亿</td></tr>
+            <tr><td class="rowname">研发费用</td><td class="num">16亿</td><td class="num">18亿</td><td class="num">20亿</td></tr>
+            <tr><td class="rowname">财务费用</td><td class="num">-12亿</td><td class="num">-14亿</td><td class="num">-16亿</td></tr>
+            <tr class="total-row"><td class="rowname">营业利润</td><td class="num">1640亿</td><td class="num">1740亿</td><td class="num">1860亿</td></tr>
+            <tr class="total-row"><td class="rowname">利润总额</td><td class="num">1642亿</td><td class="num">1742亿</td><td class="num">1862亿</td></tr>
+            <tr class="total-row"><td class="rowname">净利润</td><td class="num">1235亿</td><td class="num">1310亿</td><td class="num">1401亿</td></tr>
+            <tr class="total-row"><td class="rowname">归母净利润</td><td class="num">1202亿</td><td class="num">1276亿</td><td class="num">1365亿</td></tr>
+            <tr class="total-row"><td class="rowname">扣非归母净利润</td><td class="num">1200亿</td><td class="num">1273亿</td><td class="num">1360亿</td></tr>
+            <tr class="total-row"><td class="rowname">综合收益总额</td><td class="num">1238亿</td><td class="num">1312亿</td><td class="num">1405亿</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="legend">加粗浅蓝的行 = <b>营业总收入 / 营业总成本 / 营业利润 / 利润总额 / 净利润 / 归母净利润 / 扣非归母净利润 / 综合收益总额</b>（即 <code>INCOME_TOP</code>）。</div>
+  </div>
+
+  <!-- 现金流量表 -->
+  <div class="block">
+    <h2>现金流量表 <span class="tag">本次新增摘要+高亮</span></h2>
+    <div class="sub">顶部新增「主要合计（摘要）」卡片；表内三活动的「流入小计 / 流出小计 / 净额」以及「净增加额 / 期初 / 期末余额」整行加粗 + 浅蓝底。</div>
+    <div class="cmp">
+      <div class="col">
+        <h3>① 优化后 · 顶部摘要卡片</h3>
+        <div class="summary-card">
+          <div class="ttl">主要合计（摘要 · 详见下方明细）</div>
+          <table>
+            <thead><tr><th style="text-align:left">主要合计</th><th>2023</th><th>2024</th><th>2025</th></tr></thead>
+            <tbody>
+              <tr class="total-row"><td class="rowname">经营活动现金流入小计</td><td class="num">1600亿</td><td class="num">1710亿</td><td class="num">1820亿</td></tr>
+              <tr class="total-row"><td class="rowname">经营活动现金流出小计</td><td class="num">980亿</td><td class="num">1040亿</td><td class="num">1100亿</td></tr>
+              <tr class="total-row"><td class="rowname">经营活动现金流量净额</td><td class="num">620亿</td><td class="num">670亿</td><td class="num">720亿</td></tr>
+              <tr class="total-row"><td class="rowname">投资活动现金流量净额</td><td class="num">-110亿</td><td class="num">-95亿</td><td class="num">-130亿</td></tr>
+              <tr class="total-row"><td class="rowname">筹资活动现金流量净额</td><td class="num">-180亿</td><td class="num">-150亿</td><td class="num">-160亿</td></tr>
+              <tr class="total-row"><td class="rowname">现金及现金等价物净增加额</td><td class="num">330亿</td><td class="num">425亿</td><td class="num">430亿</td></tr>
+              <tr class="total-row"><td class="rowname">期末现金及现金等价物余额</td><td class="num">1500亿</td><td class="num">1925亿</td><td class="num">2355亿</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col">
+        <h3>② 优化后 · 明细表（加粗高亮行）</h3>
+        <table>
+          <thead><tr><th style="text-align:left">现金流量表科目</th><th>2023</th><th>2024</th><th>2025</th></tr></thead>
+          <tbody>
+            <tr><td class="rowname">销售商品、提供劳务收到的现金</td><td class="num">1560亿</td><td class="num">1670亿</td><td class="num">1780亿</td></tr>
+            <tr><td class="rowname">收到的税费返还</td><td class="num">12亿</td><td class="num">14亿</td><td class="num">15亿</td></tr>
+            <tr><td class="rowname">收到其他与经营活动有关的现金</td><td class="num">28亿</td><td class="num">26亿</td><td class="num">25亿</td></tr>
+            <tr class="total-row"><td class="rowname">经营活动现金流入小计</td><td class="num">1600亿</td><td class="num">1710亿</td><td class="num">1820亿</td></tr>
+            <tr><td class="rowname">购买商品、接受劳务支付的现金</td><td class="num">410亿</td><td class="num">440亿</td><td class="num">460亿</td></tr>
+            <tr><td class="rowname">支付给职工的现金</td><td class="num">120亿</td><td class="num">130亿</td><td class="num">140亿</td></tr>
+            <tr><td class="rowname">支付的各项税费</td><td class="num">430亿</td><td class="num">455亿</td><td class="num">485亿</td></tr>
+            <tr class="total-row"><td class="rowname">经营活动现金流出小计</td><td class="num">980亿</td><td class="num">1040亿</td><td class="num">1100亿</td></tr>
+            <tr class="total-row"><td class="rowname">经营活动现金流量净额</td><td class="num">620亿</td><td class="num">670亿</td><td class="num">720亿</td></tr>
+            <tr class="total-row"><td class="rowname">投资活动现金流量净额</td><td class="num">-110亿</td><td class="num">-95亿</td><td class="num">-130亿</td></tr>
+            <tr class="total-row"><td class="rowname">筹资活动现金流量净额</td><td class="num">-180亿</td><td class="num">-150亿</td><td class="num">-160亿</td></tr>
+            <tr class="total-row"><td class="rowname">现金及现金等价物净增加额</td><td class="num">330亿</td><td class="num">425亿</td><td class="num">430亿</td></tr>
+            <tr class="total-row"><td class="rowname">期末现金及现金等价物余额</td><td class="num">1500亿</td><td class="num">1925亿</td><td class="num">2355亿</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="legend">加粗浅蓝的行 = 三活动的 <b>流入小计 / 流出小计 / 净额</b> + <b>现金及现金等价物净增加额 / 期初余额 / 期末余额</b>（即 <code>CASH_TOP</code>）。</div>
+  </div>
+
+  <!-- 资产负债表（已有，供对照） -->
+  <div class="block">
+    <h2>资产负债表 <span class="tag">原有，保持不变</span></h2>
+    <div class="sub">此前已有顶部摘要卡片与加粗高亮；本次未改动其行为（「固定资产」等维持不高亮，与你之前看到的一致）。</div>
+    <div class="summary-card">
+      <div class="ttl">主要合计（摘要 · 详见下方明细）</div>
+      <table>
+        <thead><tr><th style="text-align:left">主要合计</th><th>2023</th><th>2024</th><th>2025</th></tr></thead>
+        <tbody>
+          <tr class="total-row"><td class="rowname">资产总计</td><td class="num">2680亿</td><td class="num">2910亿</td><td class="num">3120亿</td></tr>
+          <tr class="total-row"><td class="rowname">负债合计</td><td class="num">490亿</td><td class="num">520亿</td><td class="num">540亿</td></tr>
+          <tr class="total-row"><td class="rowname">归属于母公司股东权益合计</td><td class="num">2190亿</td><td class="num">2390亿</td><td class="num">2580亿</td></tr>
+          <tr class="total-row"><td class="rowname">流动资产合计</td><td class="num">2010亿</td><td class="num">2190亿</td><td class="num">2350亿</td></tr>
+          <tr class="total-row"><td class="rowname">非流动资产合计</td><td class="num">670亿</td><td class="num">720亿</td><td class="num">770亿</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">加粗浅蓝的行 = <code>BALANCE_TOP</code>（资产总计 / 负债合计 / 归母权益合计 / 流动·非流动资产合计 / 流动·非流动负债合计 / 固定资产 / 负债和所有者权益总计）。</div>
+  </div>
+
+</div>
+</body>
+</html>

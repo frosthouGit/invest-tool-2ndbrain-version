@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 问答 · 设置 · 投资小工具</title>
+<style>
+  :root{
+    --bg:#ffffff; --bg2:#f7f8fa; --line:#e6e8eb; --muted:#6b7280; --ink:#1f2329;
+    --brand:#185fa5; --brand2:#e6f1fb; --ok:#0f6e56; --warn:#b45309;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg2);font-size:14px;}
+  header{padding:14px 20px;background:var(--bg);border-bottom:1px solid var(--line);font-weight:500;font-size:16px;display:flex;align-items:center;justify-content:space-between}
+  header span{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px;}
+  nav{display:flex;gap:8px;font-size:14px;font-weight:400}
+  nav a{color:var(--muted);text-decoration:none;}
+  nav a.active{color:var(--brand);font-weight:500;}
+  .wrap{max-width:1000px;margin:0 auto;padding:18px 20px 60px;}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+  label{font-size:13px;color:var(--muted);display:block;margin:10px 0 4px;}
+  input[type=text],textarea,input[type=file],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);font-family:inherit;}
+  textarea{resize:vertical;min-height:64px;}
+  button{cursor:pointer;padding:9px 16px;border:1px solid var(--line);background:var(--bg);border-radius:8px;font-size:14px;}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand);}
+  button.primary:hover{background:#114a82}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .row > div{flex:1;min-width:160px;}
+  .ai-note{border:1px solid #f0d9a8;background:#fff8ec;color:#8a5a00;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:14px;}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px;}
+  .err{color:#b91c1c;font-size:13px;margin-top:8px;display:none;}
+  .err.show{display:block}
+  .ok{color:var(--ok);font-size:13px;margin-top:8px;display:none;}
+  .ok.show{display:block}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .lib-company{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px;}
+  .lib-company h4{margin:0 0 6px;font-size:14px;}
+  .rep{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted);padding:4px 0;border-top:1px dashed var(--line);}
+  .rep:first-child{border-top:none;}
+  .rep .del{cursor:pointer;color:#b91c1c;font-size:12px;border:none;background:none;padding:2px 6px;}
+  .rep .meta{font-size:12px;}
+  .usage-grid{display:flex;flex-wrap:wrap;gap:14px 28px;margin-top:8px;}
+  .usage-grid .u{font-size:13px;}
+  .usage-grid .u b{font-size:18px;color:var(--brand);font-variant-numeric:tabular-nums;}
+  .usage-cost b{color:var(--warn);}
+  .prov-badge{display:inline-block;font-size:12px;color:var(--brand);background:var(--brand2);border-radius:6px;padding:2px 8px;margin-left:6px;}
+</style>
+</head>
+<body>
+<header>
+  AI 问答 · 设置 <span>配置模型供应商 · 上传年报 · 查看用量</span>
+  <nav>
+    <a href="/">公司分析</a>
+    <a href="/screen">选股</a>
+    <a href="/record">记录</a>
+    <a href="/qa" class="active">AI 问答设置</a>
+  </nav>
+</header>
+<div class="wrap">
+
+  <div class="ai-note">
+    本页只负责<strong>设置</strong>：选择模型供应商（DeepSeek / 腾讯 TokenHub 等）、填入对应 API Key、把年报 PDF 加入文档库、查看累计用量。
+    真正的问答窗口在<strong>「公司分析」标签页</strong>里——选好公司生成对比后，最右侧会多出「AI 问答」页签，自动引用所有指标列表与已传年报。
+    不同供应商各自填各自的 Key，互不影响。
+  </div>
+
+  <!-- 供应商 / API key 配置 -->
+  <div class="card" id="keyCard">
+    <strong>第 1 步：选择模型供应商并配置 API Key</strong>
+    <div id="keyOk" class="ok"></div>
+    <div class="row" style="margin-top:8px;">
+      <div>
+        <label>模型供应商（可切换）</label>
+        <select id="provider"></select>
+      </div>
+      <div>
+        <label>模型</label>
+        <select id="model"></select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px;align-items:center;">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer;">
+        <input type="checkbox" id="allowGeneral"> 允许结合公开常识补充（财报数据不足时，模型可用自身知识补一段，并标注「结合公开常识」）
+      </label>
+    </div>
+    <div class="hint" style="margin-top:4px;">关（默认）= 严格只基于你给的三大表/年报，不知道就说未披露；开 = 回答更接近网页版 DeepSeek，但可能含财报外的信息。</div>
+    <div id="keyLabel" style="font-size:13px;color:var(--muted);margin-top:10px;">API Key（仅存本地 config.json，不上传任何人）</div>
+    <input type="text" id="apiKey" placeholder="粘贴对应供应商的 API Key（留空则不修改已保存的 Key）" autocomplete="off">
+    <div class="hint" id="keyHint"></div>
+    <div class="row" style="margin-top:8px;">
+      <button class="primary" id="btnSaveKey">保存设置</button>
+      <span class="hint" style="align-self:center;">没有 Key？DeepSeek 去 platform.deepseek.com；腾讯 TokenHub 去腾讯云大模型 API 控制台。各按量付费（一次问答通常几分钱）。</span>
+    </div>
+  </div>
+
+  <!-- 上传年报到文档库 -->
+  <div class="card">
+    <strong>第 2 步：把年报加入文档库（按公司归集，一家公司可传多年报）</strong>
+    <div class="row" style="margin-top:8px;">
+      <div><label>公司名称（必填，如：紫金矿业）</label><input type="text" id="company" placeholder="紫金矿业"></div>
+      <div><label>年份（可选，留空自动从文件名识别）</label><input type="text" id="year" placeholder="2024"></div>
+    </div>
+    <label style="margin-top:10px;">年报 PDF（可一次选多份：同一公司多年报、或不同公司分批上传）</label>
+    <input type="file" id="pdfs" accept=".pdf" multiple>
+    <div class="row" style="margin-top:8px;">
+      <button class="primary" id="btnUpload">上传并建立索引</button>
+      <span id="uploadStatus" class="hint" style="align-self:center;"></span>
+    </div>
+    <div class="hint">上传后工具会在本地把 PDF 文字抽出、切成小段建索引（每份几百页约几秒）。索引只建一次；你传的紫金矿业年报在
+      <code>F:\workbuddy data\2026-07-25-11-19-41\financial_tool\data\reports\</code> 里已有近三年三份，可直接用。</div>
+  </div>
+
+  <!-- 文档库 -->
+  <div class="card">
+    <strong>文档库</strong>
+    <div id="library"><span class="hint">（还没有任何年报，请先在上面上传）</span></div>
+  </div>
+
+  <!-- 累计用量 / 费用预估 -->
+  <div class="card">
+    <strong>累计用量 / 费用预估</strong>
+    <div class="usage-grid">
+      <div class="u">调用次数<br><b id="uCalls">0</b></div>
+      <div class="u">输入 tokens<br><b id="uPrompt">0</b></div>
+      <div class="u">其中缓存命中<br><b id="uCached">0</b></div>
+      <div class="u">输出 tokens<br><b id="uComp">0</b></div>
+      <div class="u">总 tokens<br><b id="uTotal">0</b></div>
+      <div class="u usage-cost">预估费用<br><b id="uCost">¥0.00</b></div>
+    </div>
+    <div class="hint" id="priceHint" style="margin-top:10px;"></div>
+    <div class="row" style="margin-top:12px;">
+      <button id="btnRefreshUsage">刷新</button>
+      <button id="btnResetUsage">重置统计</button>
+      <span class="hint" style="align-self:center;">费用按各次调用的实际模型费率累加，仅供参考（以各供应商官网账单为准）。</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let PROV = {};      // {id: {name, key_hint, models:[{id,label,pricing}]}}
+let KEYS = {};      // {id: bool}
+let CUR = {provider:'deepseek', model:''};
+
+(async ()=>{
+  try{
+    const r = await fetch('/api/qa/config'); const j = await r.json();
+    PROV = {}; j.providers.forEach(p=>PROV[p.id]=p);
+    KEYS = j.keys||{};
+    CUR.provider = j.provider; CUR.model = j.model;
+    $('allowGeneral').checked = !!j.allow_general;
+    const ps = $('provider');
+    ps.innerHTML = j.providers.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    ps.value = CUR.provider;
+    fillModels(CUR.provider, CUR.model);
+    refreshKeyState();
+  }catch(e){}
+  await loadLibrary();
+  await loadUsage();
+})();
+
+function fillModels(provider, selModel){
+  const p = PROV[provider]; if(!p) return;
+  const ms = $('model');
+  ms.innerHTML = p.models.map(m=>`<option value="${m.id}">${m.label}</option>`).join('');
+  if(selModel && p.models.some(m=>m.id===selModel)) ms.value = selModel;
+  else ms.value = p.models[0].id;
+  updatePriceHint();
+}
+
+function refreshKeyState(){
+  const p = PROV[CUR.provider];
+  $('keyHint').textContent = p ? ('Key 获取方式：'+p.key_hint) : '';
+  $('keyLabel').textContent = (p?p.name:'') + ' API Key（仅存本地 config.json，不上传任何人）';
+  if(KEYS[CUR.provider]){
+    $('keyOk').textContent = '✓ 「'+(p?p.name:'')+'」Key 已上传并保存到本地，可直接使用（如需更换，在下方填写新 Key 并保存）';
+    $('keyOk').classList.add('show');
+  } else {
+    $('keyOk').classList.remove('show');
+  }
+  $('apiKey').value = '';   // 不回显密钥；切换供应商时清空，提示用户粘贴对应 Key
+}
+
+$('provider').onchange = ()=>{
+  CUR.provider = $('provider').value;
+  fillModels(CUR.provider, '');
+  refreshKeyState();
+};
+$('model').onchange = ()=>{ CUR.model = $('model').value; updatePriceHint(); };
+
+function updatePriceHint(){
+  const p = PROV[CUR.provider]; if(!p) return;
+  const m = p.models.find(x=>x.id===$('model').value);
+  const pr = (m&&m.pricing)||{input_hit:0,input_miss:0,output:0};
+  $('priceHint').innerHTML = `当前模型 <b>${m?m.id:''}</b> 计费参考（元/百万 tokens）：缓存命中输入 ${pr.input_hit}、未命中输入 ${pr.input_miss}、输出 ${pr.output}。`
+    + (m && m.id==='hy3-preview' ? '（HY3 按输入长度分三档，此处按最常见的 &lt;16k 档预估）' : '');
+}
+
+$('btnSaveKey').onclick = async ()=>{
+  const key = $('apiKey').value.trim();
+  if(!key && !KEYS[CUR.provider]){ alert('请先填写 Key'); return; }
+  try{
+    await fetch('/api/qa/config',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider:CUR.provider, model:$('model').value, key, allow_general:$('allowGeneral').checked})});
+    if(key) KEYS[CUR.provider]=true;
+    refreshKeyState();
+  }catch(e){ alert('保存失败：'+e.message); }
+};
+
+async function loadLibrary(){
+  try{
+    const r = await fetch('/api/qa/library'); LIBRARY = await r.json();
+    renderLibrary();
+  }catch(e){}
+}
+let LIBRARY = {};
+function renderLibrary(){
+  const el = $('library');
+  const names = Object.keys(LIBRARY);
+  if(!names.length){
+    el.innerHTML = '<span class="hint">（还没有任何年报，请先在上面上传）</span>';
+    return;
+  }
+  el.innerHTML = names.map(c=>{
+    const reps = LIBRARY[c].map(r=>{
+      const meta = `${r.year} · ${r.pages}页 · ${r.n_chunks}段${r.error?' · ⚠'+r.error:''}`;
+      return `<div class="rep"><span>${r.file} <span class="meta">${meta}</span></span>
+        <button class="del" data-c="${c}" data-f="${r.file}">删除</button></div>`;
+    }).join('');
+    return `<div class="lib-company"><h4>${c}（${LIBRARY[c].length} 份）</h4>${reps}</div>`;
+  }).join('');
+  el.querySelectorAll('.del').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!confirm('确定从文档库删除这份年报？')) return;
+      await fetch('/api/qa/remove',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({company:b.dataset.c, file:b.dataset.f})});
+      await loadLibrary();
+    };
+  });
+}
+
+$('btnUpload').onclick = async ()=>{
+  const company = $('company').value.trim();
+  const files = $('pdfs').files;
+  if(!company){ alert('请先填写公司名称'); return; }
+  if(!files.length){ alert('请先选择 PDF 文件'); return; }
+  $('uploadStatus').textContent='上传中…（多份年报会逐份建索引，请稍候）';
+  try{
+    const fd = new FormData();
+    fd.append('company', company); fd.append('year', $('year').value.trim());
+    for(const f of files) fd.append('files', f);
+    const r = await fetch('/api/qa/upload',{method:'POST',body:fd});
+    const j = await r.json();
+    if(j.error){ alert(j.error); $('uploadStatus').textContent=''; return; }
+    const okN = (j.added||[]).length, failN=(j.failed||[]).length;
+    $('uploadStatus').textContent=`✓ ${company}：成功 ${okN} 份${failN?`，失败 ${failN} 份`:''}`;
+    await loadLibrary();
+  }catch(e){ alert('上传失败：'+e.message); $('uploadStatus').textContent=''; }
+};
+
+async function loadUsage(){
+  try{
+    const r = await fetch('/api/qa/usage'); const u = await r.json();
+    $('uCalls').textContent = u.calls||0;
+    $('uPrompt').textContent = (u.prompt_tokens||0).toLocaleString();
+    $('uCached').textContent = (u.cached_tokens||0).toLocaleString();
+    $('uComp').textContent = (u.completion_tokens||0).toLocaleString();
+    $('uTotal').textContent = (u.total_tokens||0).toLocaleString();
+    $('uCost').textContent = '¥' + (u.cost_rmb||0).toFixed(2);
+  }catch(e){}
+}
+$('btnRefreshUsage').onclick = loadUsage;
+$('btnResetUsage').onclick = async ()=>{
+  if(!confirm('确定清零累计用量统计？')) return;
+  await fetch('/api/qa/usage/reset',{method:'POST'});
+  await loadUsage();
+};
+</script>
+</body>
+</html>
