@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>选股 · 投资小工具</title>
+<style>
+  :root{
+    --bg:#ffffff; --bg2:#f7f8fa; --line:#e6e8eb; --muted:#6b7280; --ink:#1f2329;
+    --brand:#185fa5; --brand2:#e6f1fb; --ok:#0f6e56; --warn:#b45309;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg2);font-size:14px;}
+  header{padding:14px 20px;background:var(--bg);border-bottom:1px solid var(--line);font-weight:500;font-size:16px;display:flex;align-items:center;justify-content:space-between}
+  header span{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px;}
+  nav{display:flex;gap:8px;font-size:14px;font-weight:400}
+  nav a{color:var(--muted);text-decoration:none;}
+  nav a.active{color:var(--brand);font-weight:500;}
+  .wrap{max-width:1280px;margin:0 auto;padding:18px 20px 60px;}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  label{font-size:13px;color:var(--muted);margin-right:2px;}
+  input[type=number],select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);width:110px;}
+  button{cursor:pointer;padding:8px 14px;border:1px solid var(--line);background:var(--bg);border-radius:8px;font-size:14px;}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand);}
+  button:hover{border-color:var(--brand)}
+  button.primary:hover{background:#114a82}
+  .field{display:flex;align-items:center;gap:4px;background:var(--bg2);padding:6px 8px;border-radius:8px;}
+  .field input{width:78px;padding:5px 7px;}
+  .presets{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{display:inline-flex;align-items:center;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--bg2);font-size:13px;cursor:pointer;user-select:none;}
+  .chip:hover{border-color:var(--brand);color:var(--brand);}
+  .hint{color:var(--muted);font-size:12px;margin-top:8px;}
+  .badge-hk{display:inline-block;font-size:11px;color:#8a5a00;background:#ffe9c2;border-radius:6px;padding:1px 6px;margin-left:4px;}
+  .ai-note{border:1px solid #f0d9a8;background:#fff8ec;color:#8a5a00;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:14px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+  .tbl-scroll{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:60vh;}
+  table{border-collapse:collapse;font-size:13px;min-width:100%;}
+  th,td{border:0.5px solid var(--line);padding:6px 8px;white-space:nowrap;text-align:right;}
+  th.l,td.l{text-align:left;}
+  thead th{background:var(--brand2);color:var(--brand);font-weight:500;position:sticky;top:0;cursor:pointer;user-select:none;}
+  thead th:hover{background:#d6e8f8;}
+  td.num{font-variant-numeric:tabular-nums;}
+  td.neg{color:#cf1322;}
+  .err{color:#b91c1c;font-size:13px;margin-top:8px;display:none;}
+  .err.show{display:block}
+  .sel-all{margin-right:6px;}
+  .mini{padding:5px 10px;font-size:13px;}
+</style>
+</head>
+<body>
+<header>
+  选股 <span>限定池（沪深300 + 港股通）· 估值/质量/成长筛选</span>
+  <nav>
+    <a href="/">公司分析</a>
+    <a href="/screen" class="active">选股</a>
+    <a href="/record">记录</a>
+    <a href="/qa">AI 问答设置</a>
+  </nav>
+</header>
+<div class="wrap">
+
+  <div class="ai-note">
+    本页是<strong>机械筛选</strong>：按你设的条件从池中挑股票。分析结论请<strong>完全手动</strong>——把筛选结果拿去 WorkBuddy 让我分析，结论再存回记录页。工具不接任何自动对话。
+  </div>
+
+  <div class="card">
+    <div class="row" style="align-items:flex-end;">
+      <div class="field"><label>市场</label>
+        <select id="f_market">
+          <option value="all">全部</option>
+          <option value="A股">A股</option>
+          <option value="港股">港股</option>
+        </select>
+      </div>
+      <div class="field"><label>PE ≥</label><input type="number" id="f_pe_min" step="0.1"></div>
+      <div class="field"><label>PE ≤</label><input type="number" id="f_pe_max" step="0.1"></div>
+      <div class="field"><label>PB ≤</label><input type="number" id="f_pb_max" step="0.1"></div>
+      <div class="field"><label>股息率% ≥</label><input type="number" id="f_dy_min" step="0.1"></div>
+      <div class="field"><label>ROE% ≥</label><input type="number" id="f_roe_min" step="0.1"></div>
+      <div class="field"><label>负债率% ≤</label><input type="number" id="f_debt_max" step="0.1"></div>
+      <div class="field"><label>营收增速% ≥</label><input type="number" id="f_rvg_min" step="0.1"></div>
+      <div class="field"><label>利润增速% ≥</label><input type="number" id="f_pg_min" step="0.1"></div>
+      <button class="primary" id="btnGo">生成筛选</button>
+    </div>
+    <div class="presets">
+      <span class="chip" data-preset="value">低估值高股息</span>
+      <span class="chip" data-preset="quality">高ROE低负债</span>
+      <span class="chip" data-preset="growth">高成长</span>
+      <span class="chip" data-preset="dividend">红利稳健</span>
+      <span class="chip" data-preset="clear">清空条件</span>
+    </div>
+    <div class="hint" id="metaHint"></div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div>
+        <span id="countHint" style="color:var(--muted)">未筛选</span>
+        <button class="mini" id="btnWatch" style="margin-left:10px;">加入观察池</button>
+      </div>
+      <button class="mini primary" id="btnExport">导出 Excel</button>
+    </div>
+    <div class="tbl-scroll">
+      <table id="tbl">
+        <thead><tr>
+          <th class="l"><input type="checkbox" class="sel-all" id="selAll"></th>
+          <th class="l" data-k="code">代码</th>
+          <th class="l" data-k="name">名称</th>
+          <th class="l" data-k="market">市场</th>
+          <th data-k="price">现价</th>
+          <th data-k="mcap">总市值(亿)</th>
+          <th data-k="pe">PE</th>
+          <th data-k="pb">PB</th>
+          <th data-k="dy">股息率%</th>
+          <th data-k="roe">ROE%</th>
+          <th data-k="debt">负债率%</th>
+          <th data-k="rev_g">营收增速%</th>
+          <th data-k="profit_g">利润增速%</th>
+          <th class="l" data-k="asof">截至</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+</div>
+
+<script>
+const STATE = { rows: [], sort_by: 'dy', desc: true };
+
+function readFilters(){
+  const g = id => document.getElementById(id).value.trim();
+  return {
+    market: document.getElementById('f_market').value,
+    pe_min: g('f_pe_min'), pe_max: g('f_pe_max'), pb_max: g('f_pb_max'),
+    dy_min: g('f_dy_min'), roe_min: g('f_roe_min'), debt_max: g('f_debt_max'),
+    rvg_min: g('f_rvg_min'), pg_min: g('f_pg_min'),
+  };
+}
+function showErr(m){ const e=document.getElementById('err'); e.textContent=m; e.classList.add('show'); }
+function hideErr(){ document.getElementById('err').classList.remove('show'); }
+
+const PRESETS = {
+  value:    { pe_max:15, dy_min:3,  roe_min:10 },
+  quality:  { roe_min:15, debt_max:50 },
+  growth:   { rvg_min:20, pg_min:20 },
+  dividend: { dy_min:2,  debt_max:60, roe_min:8 },
+};
+document.querySelectorAll('.chip').forEach(c=>{
+  c.onclick = ()=>{
+    const p = c.getAttribute('data-preset');
+    if(p==='clear'){ ['f_pe_min','f_pe_max','f_pb_max','f_dy_min','f_roe_min','f_debt_max','f_rvg_min','f_pg_min'].forEach(id=>document.getElementById(id).value=''); return; }
+    const set = PRESETS[p]||{};
+    // 先清空，再填预设（预设未覆盖的保持空）
+    ['f_pe_min','f_pe_max','f_pb_max','f_dy_min','f_roe_min','f_debt_max','f_rvg_min','f_pg_min'].forEach(id=>document.getElementById(id).value='');
+    if('pe_max' in set) document.getElementById('f_pe_max').value=set.pe_max;
+    if('dy_min' in set) document.getElementById('f_dy_min').value=set.dy_min;
+    if('roe_min' in set) document.getElementById('f_roe_min').value=set.roe_min;
+    if('debt_max' in set) document.getElementById('f_debt_max').value=set.debt_max;
+    if('rvg_min' in set) document.getElementById('f_rvg_min').value=set.rvg_min;
+    if('pg_min' in set) document.getElementById('f_pg_min').value=set.pg_min;
+    go();
+  };
+});
+
+async function go(){
+  hideErr();
+  const body = { filters: readFilters(), sort_by: STATE.sort_by, desc: STATE.desc };
+  try{
+    const r = await fetch('/api/screen', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const j = await r.json();
+    if(j.error){ showErr(j.error); return; }
+    STATE.rows = j.rows||[];
+    document.getElementById('countHint').textContent = '命中 '+STATE.rows.length+' 只' + (j.built_at?('（数据截至 '+j.built_at+'）'):'');
+    render();
+  }catch(e){ showErr('筛选失败：'+e.message); }
+}
+
+function fmtCell(v, k){
+  if(v===null||v===undefined||v==='') return '—';
+  if(k==='mcap') return (v/1e8).toLocaleString(undefined,{maximumFractionDigits:1});
+  if(k==='price') return Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
+  if(['pe','pb','dy','roe','debt','rev_g','profit_g'].includes(k)) return Number(v).toFixed(2);
+  return v;
+}
+function render(){
+  const tb = document.getElementById('tbody');
+  tb.innerHTML='';
+  STATE.rows.forEach((r,i)=>{
+    const tr=document.createElement('tr');
+    const neg = (k)=> (typeof r[k]==='number' && r[k]<0);
+    const cls = k => (neg(k)?' class="num neg"':' class="num"');
+    tr.innerHTML =
+      '<td class="l"><input type="checkbox" class="row-sel" data-i="'+i+'"></td>'+
+      '<td class="l">'+r.code+'</td>'+
+      '<td class="l">'+r.name+(r.market==='港股'?'<span class="badge-hk">港股</span>':'')+'</td>'+
+      '<td class="l">'+r.market+'</td>'+
+      '<td'+cls('price')+'>'+fmtCell(r.price,'price')+'</td>'+
+      '<td'+cls('mcap')+'>'+fmtCell(r.mcap,'mcap')+'</td>'+
+      '<td'+cls('pe')+'>'+fmtCell(r.pe,'pe')+'</td>'+
+      '<td'+cls('pb')+'>'+fmtCell(r.pb,'pb')+'</td>'+
+      '<td'+cls('dy')+'>'+fmtCell(r.dy,'dy')+'</td>'+
+      '<td'+cls('roe')+'>'+fmtCell(r.roe,'roe')+'</td>'+
+      '<td'+cls('debt')+'>'+fmtCell(r.debt,'debt')+'</td>'+
+      '<td'+cls('rev_g')+'>'+fmtCell(r.rev_g,'rev_g')+'</td>'+
+      '<td'+cls('profit_g')+'>'+fmtCell(r.profit_g,'profit_g')+'</td>'+
+      '<td class="l">'+r.asof+'</td>';
+    tb.appendChild(tr);
+  });
+}
+
+document.querySelectorAll('thead th[data-k]').forEach(th=>{
+  th.onclick = ()=>{
+    const k = th.getAttribute('data-k');
+    if(STATE.sort_by===k) STATE.desc=!STATE.desc; else { STATE.sort_by=k; STATE.desc=true; }
+    go();
+  };
+});
+
+document.getElementById('selAll').onchange = e=>{
+  document.querySelectorAll('.row-sel').forEach(c=>c.checked=e.target.checked);
+};
+document.getElementById('btnGo').onclick = go;
+
+document.getElementById('btnExport').onclick = async ()=>{
+  const body = { filters: readFilters(), sort_by: STATE.sort_by, desc: STATE.desc };
+  try{
+    const r = await fetch('/api/screen/export', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    if(!r.ok){ showErr('导出失败'); return; }
+    const blob = await r.blob();
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='选股结果.xlsx'; a.click();
+  }catch(e){ showErr('导出失败：'+e.message); }
+};
+
+document.getElementById('btnWatch').onclick = async ()=>{
+  const idxs=[...document.querySelectorAll('.row-sel:checked')].map(c=>+c.getAttribute('data-i'));
+  if(!idxs.length){ showErr('请先勾选要加入观察池的股票'); return; }
+  for(const i of idxs){
+    const r=STATE.rows[i];
+    await fetch('/api/watch',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code:r.code, name:r.name, market:r.market||'A股'})});
+  }
+  const b=document.getElementById('btnWatch'); const old=b.textContent;
+  b.textContent='已加入 ✓'; setTimeout(()=>{b.textContent=old;},1500);
+};
+
+// 首次进入自动跑一次（全部，按股息率降序）
+go();
+</script>
+</body>
+</html>
