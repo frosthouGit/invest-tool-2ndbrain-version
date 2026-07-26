@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>公司对比分析 · 投资小工具</title>
+<script src="/static/vendor/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#ffffff; --bg2:#f7f8fa; --line:#e6e8eb; --muted:#6b7280; --ink:#1f2329;
+    --brand:#185fa5; --brand2:#e6f1fb; --ok:#0f6e56; --warn:#b45309;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg2);font-size:14px;}
+  header{padding:14px 20px;background:var(--bg);border-bottom:1px solid var(--line);font-weight:500;font-size:16px;}
+  header span{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 60px;}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  label{font-size:13px;color:var(--muted);margin-right:4px;}
+  input[type=text],input[type=number]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);}
+  input.code{width:160px}
+  button{cursor:pointer;padding:8px 14px;border:1px solid var(--line);background:var(--bg);border-radius:8px;font-size:14px;}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand);}
+  button:hover{border-color:var(--brand)}
+  button.primary:hover{background:#114a82}
+  .peers{margin-top:12px;display:none;}
+  .peers.show{display:block;}
+  .peer-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg2);font-size:13px;cursor:pointer;user-select:none;}
+  .chip.sel{background:var(--brand2);border-color:var(--brand);color:var(--brand);}
+  .chip input{display:none}
+  .sel-list{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;}
+  .sel-list .s{background:var(--brand2);color:var(--brand);border:1px solid var(--brand);border-radius:999px;padding:5px 10px;font-size:13px;}
+  .sel-list .s b{margin-left:6px;cursor:pointer;font-weight:600;}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:14px;flex-wrap:wrap;}
+  .tab{padding:8px 14px;cursor:pointer;border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;color:var(--muted);}
+  .tab.active{color:var(--brand);background:var(--bg);border-color:var(--line);font-weight:500;}
+  .panel{display:none}
+  .panel.active{display:block}
+  .chart-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+  .chart-box{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);}
+  .chart-box h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:500;}
+  .tbl-scroll{overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  table{border-collapse:collapse;font-size:13px;min-width:100%;}
+  th,td{border:0.5px solid var(--line);padding:6px 8px;white-space:nowrap;}
+  thead th{background:var(--brand2);color:var(--brand);font-weight:500;position:sticky;top:0;}
+  thead tr:nth-child(2) th{background:#eef1f4;color:var(--ink);}
+  td.rowname{background:#f7f8fa;font-weight:500;position:sticky;left:0;z-index:1;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .total-row td{font-weight:600;background:#e9f2fb;}
+  .total-row td.rowname{background:#dce9f7;}
+  .main-num{font-weight:700;}
+  .total-row td.main-num{font-weight:700;}
+  .summary-card{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:auto;}
+  .summary-card .ttl{padding:8px 10px;background:var(--brand2);color:var(--brand);font-weight:500;font-size:13px;position:sticky;left:0;}
+  .muted{color:var(--muted)}
+  .err{color:#b91c1c;font-size:13px;margin-top:8px;display:none;}
+  .err.show{display:block}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px;}
+  .hk-note{border:1px solid #f0d9a8;background:#fff8ec;color:#8a5a00;border-radius:8px;
+    padding:8px 12px;font-size:13px;margin-bottom:14px;display:none;}
+  .hk-note.show{display:block;}
+  .badge-hk{display:inline-block;font-size:11px;color:#8a5a00;background:#ffe9c2;
+    border-radius:6px;padding:1px 6px;margin-left:6px;}
+  #loading{display:none;color:var(--brand);font-size:13px;margin-top:8px;}
+  #loading.show{display:block}
+  .toolbar{display:flex;justify-content:flex-end;gap:10px;margin-bottom:14px;}
+  @media(max-width:780px){.charts{grid-template-columns:1fr}}
+  .ac-wrap{position:relative;display:inline-block;}
+  .ac-box{position:absolute;left:0;top:100%;z-index:50;background:#fff;border:1px solid var(--line);
+    border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);max-height:240px;overflow:auto;min-width:200px;display:none;}
+  .ac-item{padding:7px 10px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;}
+  .ac-item:hover,.ac-item.active{background:var(--brand2);}
+  .ac-item .code{color:var(--muted);font-size:12px;}
+  .ai-note{border:1px solid #f0d9a8;background:#fff8ec;color:#8a5a00;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:14px;}
+  .chat{display:flex;flex-direction:column;gap:10px;margin-top:6px;max-height:440px;overflow:auto;padding-right:4px;}
+  .bubble{border-radius:12px;padding:10px 12px;max-width:92%;line-height:1.7;font-size:14px;white-space:pre-wrap;word-break:break-word;}
+  .bubble.user{align-self:flex-end;background:var(--brand);color:#fff;}
+  .bubble.assistant{align-self:flex-start;background:var(--bg2);border:1px solid var(--line);}
+  .bubble .src{border-left:3px solid var(--brand2);background:var(--bg);padding:6px 8px;margin:8px 0 0;border-radius:0 6px 6px 0;font-size:12px;color:var(--muted);}
+  .bubble .src b{color:var(--brand)}
+  .chat-controls{display:flex;gap:10px;margin-top:10px;}
+  .chat-controls textarea{flex:1;}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header style="display:flex;align-items:center;justify-content:space-between">
+  公司对比分析 <span>选公司 · 拉财报 · 透视表 + 图表 + Excel</span>
+  <nav style="display:flex;gap:8px;font-size:14px;font-weight:400">
+    <a href="/" style="color:var(--brand);text-decoration:none;">公司分析</a>
+    <a href="/screen" style="color:var(--muted);text-decoration:none;">选股</a>
+    <a href="/record" style="color:var(--muted);text-decoration:none;">记录</a>
+    <a href="/qa" style="color:var(--muted);text-decoration:none;">AI 问答设置</a>
+  </nav>
+</header>
+<div class="wrap">
+
+  <div class="card">
+    <div class="row">
+      <label>主公司（代码或名称）</label>
+      <span class="ac-wrap"><input type="text" id="primary" class="code" placeholder="如 601899 / 紫金矿业" autocomplete="off"><div class="ac-box" id="ac_primary"></div></span>
+      <button id="btnPeers" class="primary">推荐同行</button>
+      <span class="hint">按行业给你拉同行清单，勾选要一起比的公司</span>
+    </div>
+    <div class="peers" id="peersBox">
+      <div class="hint" id="peersIndustry"></div>
+      <div class="peer-grid" id="peerGrid"></div>
+    </div>
+
+    <div class="row" style="margin-top:14px;">
+      <label>手动加公司</label>
+      <span class="ac-wrap"><input type="text" id="manual" class="code" placeholder="代码/名称" autocomplete="off"><div class="ac-box" id="ac_manual"></div></span>
+      <button id="btnAdd">添加</button>
+    </div>
+
+    <div class="sel-list" id="selList"></div>
+
+    <div class="row" style="margin-top:14px;">
+      <label>对比年数</label>
+      <input type="number" id="years" value="5" min="2" max="8" style="width:80px">
+      <button id="btnGen" class="primary">生成对比</button>
+      <button id="btnClearSel">清空</button>
+      <span id="loading">正在拉取财报并计算…</span>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="hk-note" id="hkNote"></div>
+    <div class="toolbar">
+      <button id="btnToWatch">加入观察池</button>
+      <button id="btnExport" class="primary">导出 Excel</button>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div id="panels"></div>
+  </div>
+
+</div>
+
+<script>
+const API = { peers: '/api/peers', compare: '/api/compare', export: '/api/export' };
+let STATE = { companies: [], years: 5, data: null, charts: {} };
+// 与图表图例一致的调色板（主公司=首个，颜色最深）
+const PALETTE = ['#185fa5','#0f6e56','#b45309','#7f77dd','#993556'];
+
+// ---------- 股票自动补全 ----------
+const AC = {};  // inputId -> {code, name} 当前选中项
+function acCode(inputId){
+  const el = document.getElementById(inputId);
+  if(!el) return null;
+  const v = el.value.trim();
+  const sel = AC[inputId];
+  return (sel && sel.name === v) ? sel.code : null;
+}
+function setupStockAc(inputId, boxId){
+  const inp = document.getElementById(inputId);
+  const box = document.getElementById(boxId);
+  if(!inp || !box) return;
+  let timer = null, items = [];
+  function render(){
+    box.innerHTML = '';
+    if(!items.length){ box.style.display = 'none'; return; }
+    items.forEach((it, i)=>{
+      const d = document.createElement('div');
+      d.className = 'ac-item' + (i === 0 ? ' active' : '');
+      const mkt = it.market==='港股' ? '<span class="badge-hk">港股</span>' : '';
+      d.innerHTML = '<span>'+it.name+mkt+'</span><span class="code">'+it.code+'</span>';
+      d.onmousedown = (e)=>{ e.preventDefault(); pick(it); };
+      box.appendChild(d);
+    });
+    box.style.display = 'block';
+  }
+  function pick(it){
+    inp.value = it.name;
+    AC[inputId] = it;
+    box.style.display = 'none';
+  }
+  inp.addEventListener('input', ()=>{
+    AC[inputId] = null;
+    const q = inp.value.trim();
+    clearTimeout(timer);
+    if(q.length < 1){ box.style.display = 'none'; return; }
+    timer = setTimeout(async ()=>{
+      try{
+        const j = await fetch('/api/stocks?q='+encodeURIComponent(q)).then(r=>r.json());
+        items = j || []; render();
+      }catch(e){ box.style.display = 'none'; }
+    }, 150);
+  });
+  inp.addEventListener('blur', ()=> setTimeout(()=> box.style.display = 'none', 150));
+  inp.addEventListener('keydown', e=>{
+    if(e.key === 'Enter' && items.length && box.style.display !== 'none'){
+      pick(items[0]); e.preventDefault();
+    }
+  });
+}
+// 把 #rrggbb 转为带透明度的 rgba（用于列底色）
+function hexA(hex,a){ const h=hex.replace('#',''); const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16); return 'rgba('+r+','+g+','+b+','+a+')'; }
+
+function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; e.classList.add('show'); }
+function hideErr(){ document.getElementById('err').classList.remove('show'); }
+
+function normCode(s){
+  s=(s||'').trim();
+  if(!s) return s;
+  // A股 6 位 或 港股 5 位
+  if(/^\d{5,6}$/.test(s)) return s;
+  const m=s.match(/\d{5,6}/); return m?m[0]:s;
+}
+function isValidCode(s){
+  return /^\d{5,6}$/.test((s||'').trim());
+}
+
+async function loadPeers(){
+  hideErr();
+  const code=acCode('primary')||normCode(document.getElementById('primary').value.trim());
+  if(!code){ showErr('请输入主公司的代码或名称'); return; }
+  try{
+    const r=await fetch(API.peers+'?code='+encodeURIComponent(code));
+    const j=await r.json();
+    if(j.error){ showErr(j.error); return; }
+    document.getElementById('peersIndustry').textContent='行业：'+(j.industry||'未知')+'（点击勾选同行）';
+    const grid=document.getElementById('peerGrid'); grid.innerHTML='';
+    (j.peers||[]).forEach(p=>{
+      const el=document.createElement('div');
+      el.className='chip'; el.setAttribute('data-code',p.code); el.setAttribute('data-name',p.name);
+      el.innerHTML=(p.name||p.code)+' <span class="muted">'+p.code+'</span>';
+      el.onclick=()=>{
+        const on=el.classList.toggle('sel');
+        if(on){ addCompany({code:p.code, name:p.name}); }
+        else { removeCompany(p.code); }
+      };
+      grid.appendChild(el);
+    });
+    document.getElementById('peersBox').classList.add('show');
+    // 自动把主公司加入对比；同行需用户点选
+    const pv=document.getElementById('primary').value.trim();
+    const pname=(AC['primary']&&AC['primary'].name===pv)?AC['primary'].name:(j.primaryName||code);
+    addCompany({code:code, name:pname});
+  }catch(e){ showErr('请求失败：'+e.message); }
+}
+
+function addCompany(c){
+  if(!c||!c.code) return;
+  if(STATE.companies.find(x=>x.code===c.code)) return;
+  STATE.companies.push(c); onSelChange();
+}
+function removeCompany(code){ STATE.companies=STATE.companies.filter(x=>x.code!==code); onSelChange(); }
+function onSelChange(){
+  renderSel();
+  // 选择变化后旧结果可能不再匹配，清空避免误导（初次恢复不走这里）
+  if(STATE.data){ STATE.data=null; document.getElementById('resultCard').style.display='none'; }
+  saveState();
+}
+function renderSel(){
+  const box=document.getElementById('selList'); box.innerHTML='';
+  STATE.companies.forEach(c=>{
+    const s=document.createElement('span'); s.className='s';
+    s.innerHTML=(c.name||c.code)+' <b data-code="'+c.code+'">×</b>';
+    s.querySelector('b').onclick=()=>removeCompany(c.code);
+    box.appendChild(s);
+  });
+}
+
+document.getElementById('btnAdd').onclick=()=>{
+  commitManual();
+};
+document.getElementById('btnPeers').onclick=loadPeers;
+setupStockAc('primary','ac_primary');
+setupStockAc('manual','ac_manual');
+// 在输入框按回车 = 自动加入并生成（无需再点按钮）
+document.getElementById('primary').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); commitPrimary(); generate(); }
+});
+document.getElementById('manual').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); commitManual(); generate(); }
+});
+
+function commitPrimary(){
+  const raw=document.getElementById('primary').value.trim();
+  if(!raw) return;
+  const sel=AC['primary'];
+  if(sel && sel.name===raw){
+    addCompany({code:sel.code, name:sel.name, market:sel.market, currency:sel.currency});
+    return;
+  }
+  const code=normCode(raw);
+  if(isValidCode(code)) addCompany({code:code, name:raw});
+}
+function commitManual(){
+  const raw=document.getElementById('manual').value.trim();
+  if(!raw) return;
+  const sel=AC['manual'];
+  if(sel && sel.name===raw){
+    addCompany({code:sel.code, name:sel.name, market:sel.market, currency:sel.currency});
+    document.getElementById('manual').value=''; AC['manual']=null;
+    return;
+  }
+  const code=normCode(raw);
+  if(isValidCode(code)){
+    addCompany({code:code, name:raw});
+    document.getElementById('manual').value=''; AC['manual']=null;
+  }
+}
+
+async function generate(){
+  hideErr();
+  // 先把当前输入框里的公司自动加入（无需先点 添加/推荐同行）
+  commitPrimary();
+  commitManual();
+  if(STATE.companies.length<1){ showErr('请至少选择一家公司'); return; }
+  STATE.years=parseInt(document.getElementById('years').value)||5;
+  document.getElementById('loading').classList.add('show');
+  try{
+    const r=await fetch(API.compare,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({companies:STATE.companies, years:STATE.years})
+    });
+    const j=await r.json();
+    if(j.error){ showErr(j.error); return; }
+    STATE.data=j;
+    renderResult();
+    saveState();
+  }catch(e){ showErr('生成失败：'+e.message); }
+  finally{ document.getElementById('loading').classList.remove('show'); }
+}
+document.getElementById('btnGen').onclick=generate;
+
+function renderResult(){
+  const data=STATE.data;
+  const tabs=document.getElementById('tabs'); const panels=document.getElementById('panels');
+  tabs.innerHTML=''; panels.innerHTML='';
+  const dataTabNames=Object.keys(data.tables);
+  const allNames=[...dataTabNames, 'AI 问答'];
+  allNames.forEach((tn,idx)=>{
+    const t=document.createElement('div'); t.className='tab'+(idx===0?' active':''); t.textContent=tn; t.onclick=()=>{
+      [...tabs.children].forEach(x=>x.classList.remove('active'));
+      [...panels.children].forEach(x=>x.classList.remove('active'));
+      t.classList.add('active'); const p=document.getElementById('panel_'+idx); if(p) p.classList.add('active');
+      if(tn!=='AI 问答') drawCharts(idx);
+    };
+    tabs.appendChild(t);
+
+    const panel=document.createElement('div'); panel.className='panel'+(idx===0?' active':''); panel.id='panel_'+idx;
+    if(tn==='AI 问答'){
+      panel.innerHTML = aiPanelHTML();
+    } else {
+      const ch=document.createElement('div'); ch.className='chart-head';
+      ch.innerHTML='<label>选一行看图表</label><select id="sel_'+idx+'"></select><span class="hint">柱状图=数值，折线图=同比(YoY)</span>';
+      panel.appendChild(ch);
+      const charts=document.createElement('div'); charts.className='charts';
+      charts.innerHTML='<div class="chart-box"><h4>柱状图 · 数值</h4><canvas id="bar_'+idx+'"></canvas></div>'+
+                       '<div class="chart-box"><h4>折线图 · 同比 %</h4><canvas id="line_'+idx+'"></canvas></div>';
+      panel.appendChild(charts);
+      const sc=document.createElement('div'); sc.className='tbl-scroll';
+      sc.innerHTML=buildTable(tn, data.tables[tn]);
+      panel.appendChild(sc);
+    }
+    // 必须先挂进 DOM，后面的 getElementById('sel_'+idx) 才找得到（修复 null appendChild）
+    panels.appendChild(panel);
+    if(tn!=='AI 问答'){
+      const sel=document.getElementById('sel_'+idx);
+      data.tables[tn].forEach((row,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=row.name; sel.appendChild(o); });
+      sel.onchange=()=>drawCharts(idx);
+    } else {
+      setupEmbeddedQA();
+    }
+  });
+  document.getElementById('resultCard').style.display='block';
+  // 港股货币说明
+  const hasHK = STATE.data.companies.some(c=>c.currency==='HKD');
+  const note=document.getElementById('hkNote');
+  if(hasHK){
+    const hkNames=STATE.data.companies.filter(c=>c.currency==='HKD').map(c=>c.name).join('、');
+    note.innerHTML='注：<b>'+hkNames+'</b> 为港股，财报数值以 <b>港币(HKD)</b> 列示；其余公司为人民币(CNY)。'
+      + '比率与同比(%)指标不受货币单位影响。';
+    note.classList.add('show');
+  }else{
+    note.classList.remove('show');
+  }
+  drawCharts(0);
+}
+
+function buildTable(title, rows){
+  const years=STATE.data.years, comps=STATE.data.companies;
+  const curTag=(c)=> c.currency==='HKD' ? ' <span style="opacity:.85;font-weight:400">HK$</span>' : '';
+  const head=(label)=>{
+    let h='<thead><tr><th rowspan="2" style="text-align:left">'+label+' \\ 年份</th>';
+    years.forEach(y=>{ h+='<th colspan="'+comps.length+'">'+y+'</th>'; });
+    h+='</tr><tr>';
+    years.forEach(()=>{ comps.forEach((c,i)=>{
+      const col=PALETTE[i%PALETTE.length];
+      const main=(c===comps[0]);
+      h+='<th style="background:'+col+';color:#fff;'+(main?'font-weight:700;':'')+'">'+c.name+curTag(c)+'</th>';
+    }); });
+    h+='</tr></thead>';
+    return h;
+  };
+  const body=(rs)=>{
+    let b='<tbody>';
+    rs.forEach(r=>{
+      const trc = r.is_total ? ' class="total-row"' : '';
+      b+='<tr'+trc+'><td class="rowname">'+r.name+'</td>';
+      years.forEach(y=>{
+        comps.forEach((c,i)=>{
+          const v=(r.values[c.name]&&r.values[c.name][y]);
+          const isMain=(c===comps[0]);
+          const txt=(v==null?'—':fmt(v));
+          if(r.is_total){
+            // 总计行：保留统一的浅蓝，主公司数字加粗
+            b+='<td class="num'+(isMain?' main-num':'')+'">'+txt+'</td>';
+          }else{
+            // 普通行：按公司列上浅色底（主公司略深），主公司数字加粗
+            const tint=hexA(PALETTE[i%PALETTE.length], isMain?0.18:0.10);
+            b+='<td class="num'+(isMain?' main-num':'')+'" style="background:'+tint+'">'+txt+'</td>';
+          }
+        });
+      });
+      b+='</tr>';
+    });
+    b+='</tbody>';
+    return b;
+  };
+  // 三大表：最前面用「主要合计」卡片重复列出关键总数/小计（摘要），并在原表中加粗浅色底
+  const topNames = (STATE.data && STATE.data.summary_top && STATE.data.summary_top[title]) || [];
+  if (topNames.length) {
+    const topRows = topNames.map(n => rows.find(r => r.name === n)).filter(Boolean);
+    if (topRows.length) {
+      let html = '<div class="summary-card"><div class="ttl">主要合计（摘要 · 详见下方明细）</div>';
+      html += '<table>' + head('主要合计') + body(topRows) + '</table></div>';
+      html += '<table>' + head(title) + body(rows) + '</table>';
+      return html;
+    }
+  }
+  return '<table>' + head(title) + body(rows) + '</table>';
+}
+
+function fmt(v){ if(Math.abs(v)>=1e8) return (v/1e8).toFixed(2)+'亿'; if(Number.isInteger(v)) return v.toLocaleString(); return (Math.round(v*100)/100).toLocaleString(); }
+
+function fmtChart(v){
+  if(v==null||v===undefined||isNaN(v)) return '';
+  const a=Math.abs(v);
+  if(a>=1e8) return (v/1e8).toFixed(2)+'亿';
+  if(a>=1e4) return (v/1e4).toFixed(1)+'万';
+  if(Number.isInteger(v)) return v.toLocaleString();
+  return (Math.round(v*100)/100).toLocaleString();
+}
+// 自定义插件：在每个柱子顶部 / 折线节点处直接标出数值（Chart.js 核心不渲染数据标签）
+const dataLabelsPlugin = {
+  id: 'datalabels',
+  afterDatasetsDraw(chart){
+    const ctx = chart.ctx;
+    const isLineChart = (chart.config.type === 'line');
+    const specs = [];   // 柱/线标签统一收集：跨公司按年份类别分组错位，避免重叠分不清
+    const xScale = chart.scales.x;
+    // 阶段一：柱/线标签都收集到 specs（均用公司颜色）；柱状图不再单独画灰色
+    chart.data.datasets.forEach((ds, di)=>{
+      if(ds._bench) return;                       // 基准线不标注
+      const meta = chart.getDatasetMeta(di);
+      if(meta.hidden) return;
+      const fmtFn = ds._fmt || (v=> v==null?'':(''+v));
+      const color = (ds.borderColor || ds.backgroundColor || '#333');
+      meta.data.forEach((el, i)=>{
+        const v = ds.data[i];
+        if(v == null || v === undefined) return;
+        const txt = fmtFn(v);
+        if(txt === '') return;
+        // catX=该年份在 x 轴上的类别中心；柱状图同一年并排柱子共享同一 catX，可归同组错位
+        const catX = xScale ? xScale.getPixelForValue(chart.data.labels[i]) : el.x;
+        specs.push({x: el.x, catX: catX, y: el.y, txt: txt, color: color});
+      });
+    });
+    // 阶段二：同一年的多个标签按 y 排序并强制最小垂直间隔，逐组向上错开；用公司颜色区分
+    if(specs.length){
+      const MIN_GAP = 11;
+      const cols = {};
+      specs.forEach(s=>{ const k = Math.round(s.catX); (cols[k] = cols[k] || []).push(s); });
+      Object.keys(cols).forEach(k=>{
+        const arr = cols[k].sort((a,b)=> a.y - b.y);
+        for(let i=1;i<arr.length;i++){
+          if(arr[i].y < arr[i-1].y + MIN_GAP) arr[i].y = arr[i-1].y + MIN_GAP;
+        }
+      });
+      ctx.save();
+      ctx.font = '10px -apple-system,"Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      specs.forEach(s=>{
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.strokeText(s.txt, s.x, s.y - 4);
+        ctx.fillStyle = s.color;
+        ctx.fillText(s.txt, s.x, s.y - 4);
+      });
+      ctx.restore();
+    }
+  }
+};
+Chart.register(dataLabelsPlugin);
+
+function drawCharts(idx){
+  const tn=Object.keys(STATE.data.tables)[idx];
+  const rows=STATE.data.tables[tn];
+  const si=parseInt(document.getElementById('sel_'+idx).value);
+  const row=rows[si];
+  const years=STATE.data.years, comps=STATE.data.companies;
+  const palette=PALETTE;
+
+  // 行业基准（同行均值）：排除主公司(首个)，取其余所选公司逐年均值；纯虚线、无任何标注
+  const peers=comps.slice(1);
+  const showBench=peers.length>=1;
+  const avgOf=(srcMap)=>years.map(y=>{
+    const vs=peers.map(c=>{const m=srcMap[c.name]; return m?m[y]:null;}).filter(v=>v!=null);
+    return vs.length? vs.reduce((a,b)=>a+b,0)/vs.length : null;
+  });
+
+  const barDs=comps.map((c,i)=>({
+    label:c.name, backgroundColor:palette[i%palette.length],
+    data:years.map(y=>row.values[c.name]?row.values[c.name][y]:null),
+    _fmt:fmtChart
+  }));
+  if(showBench){
+    barDs.push({label:'', type:'line', borderColor:'#c0392b', borderWidth:2,
+      borderDash:[6,6], pointStyle:'rectRot', pointRadius:5, fill:false,
+      data:avgOf(row.values), _bench:true});
+  }
+
+  const yoyAllNull = comps.every(c=>years.every(y=>!(row.yoy[c.name]&&row.yoy[c.name][y]!=null)));
+  const lineSrc = yoyAllNull ? row.values : row.yoy;
+  const lineFmt = yoyAllNull ? fmtChart : (v=> v==null?'':(+v).toFixed(1)+'%');
+  const lineDs=comps.map((c,i)=>({
+    label:c.name, borderColor:palette[i%palette.length], backgroundColor:palette[i%palette.length],
+    tension:0.25, data:years.map(y=>lineSrc[c.name]?lineSrc[c.name][y]:null),
+    _fmt:lineFmt
+  }));
+  if(showBench){
+    lineDs.push({label:'', type:'line', borderColor:'#c0392b', borderWidth:2,
+      borderDash:[6,6], pointStyle:'rectRot', pointRadius:5, fill:false,
+      data:avgOf(lineSrc), _bench:true});
+  }
+
+  // 基准线：图例与提示都不显示
+  const hideBenchLegend = (item, data)=> !data.datasets[item.datasetIndex]._bench;
+  const hideBenchTip = (item)=> !item.dataset._bench;
+
+  if(STATE.charts['bar_'+idx]) STATE.charts['bar_'+idx].destroy();
+  if(STATE.charts['line_'+idx]) STATE.charts['line_'+idx].destroy();
+  STATE.charts['bar_'+idx]=new Chart(document.getElementById('bar_'+idx),{
+    type:'bar', data:{labels:years, datasets:barDs},
+    options:{responsive:true, layout:{padding:{top:18}},
+      plugins:{legend:{position:'bottom', labels:{filter:hideBenchLegend}},
+        tooltip:{filter:hideBenchTip, callbacks:{label:ctx=>ctx.dataset.label+': '+fmtChart(ctx.parsed.y)}}},
+      scales:{y:{ticks:{callback:v=>fmtChart(v)}}}}
+  });
+  STATE.charts['line_'+idx]=new Chart(document.getElementById('line_'+idx),{
+    type:'line', data:{labels:years, datasets:lineDs},
+    options:{responsive:true, layout:{padding:{top:18}},
+      plugins:{legend:{position:'bottom', labels:{filter:hideBenchLegend}},
+        tooltip:{filter:hideBenchTip, callbacks:{label:ctx=>ctx.dataset.label+': '+(lineSrc===row.yoy?ctx.parsed.y.toFixed(1)+'%':fmtChart(ctx.parsed.y))}}},
+      scales:{y:{ticks:{callback:v=> lineSrc===row.yoy ? (+v).toFixed(1)+'%' : fmtChart(v)}}}}
+  });
+}
+
+document.getElementById('btnExport').onclick=async()=>{
+  if(!STATE.data) return;
+  try{
+    const r=await fetch(API.export,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(STATE.data)});
+    if(!r.ok){ showErr('导出失败'); return; }
+    const blob=await r.blob();
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='公司对比_'+new Date().toISOString().slice(0,10)+'.xlsx'; a.click();
+  }catch(e){ showErr('导出失败：'+e.message); }
+};
+
+// 一键把当前对比的公司加入观察池
+document.getElementById('btnToWatch').onclick=async()=>{
+  if(!STATE.data||!STATE.data.companies.length) return;
+  for(const c of STATE.data.companies){
+    await fetch('/api/watch',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code:c.code, name:c.name, market:c.market||'A股'})});
+  }
+  const btn=document.getElementById('btnToWatch'); const old=btn.textContent;
+  btn.textContent='已加入 ✓'; setTimeout(()=>{btn.textContent=old;},1500);
+};
+
+// ---------- 选择持久化（刷新不丢，除非点清空） ----------
+const LS_KEY='invest_analysis_v1';
+function saveState(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify({companies:STATE.companies, years:STATE.years, data:STATE.data}));
+  }catch(e){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify({companies:STATE.companies, years:STATE.years, data:null})); }catch(e2){}
+  }
+}
+function loadState(){
+  try{
+    const raw=localStorage.getItem(LS_KEY); if(!raw) return;
+    const s=JSON.parse(raw);
+    if(!s.companies||!s.companies.length) return;
+    STATE.companies=s.companies; STATE.years=s.years||5;
+    document.getElementById('years').value=STATE.years;
+    const p=s.companies[0]; document.getElementById('primary').value=(p&&(p.name||p.code))||'';
+    renderSel();
+    if(s.data){ STATE.data=s.data; renderResult(); }
+  }catch(e){}
+}
+function clearAll(){
+  STATE.companies=[]; STATE.data=null; STATE.years=5;
+  document.getElementById('primary').value=''; document.getElementById('manual').value='';
+  document.getElementById('years').value=5; AC['primary']=null; AC['manual']=null;
+  document.getElementById('peersBox').classList.remove('show'); document.getElementById('peerGrid').innerHTML='';
+  document.getElementById('selList').innerHTML='';
+  document.getElementById('resultCard').style.display='none';
+  localStorage.removeItem(LS_KEY);
+  hideErr();
+}
+
+// ---------- 内嵌 AI 问答（公司分析页第6个页签） ----------
+let QA_HISTORY=[];
+let QA_MODEL='';
+function aiPanelHTML(){
+  const comps = STATE.data ? STATE.data.companies.map(c=>c.name).join('、') : '';
+  return `
+  <div class="ai-note">本问答用你自己的 API Key（在「AI 问答设置」页配置模型供应商与 Key）实时回答，自动参考上方<strong>所有指标列表</strong>（资产负债表/利润表/现金流量表/固定指标/杜邦分析）。<strong>即使没上传年报，也能直接基于这些三大表数据提问</strong>；若你还在「AI 问答设置」页上传了对应公司的年报 PDF，会额外结合年报原文检索。当前模型：<b id="qaModelTag">加载中…</b></div>
+  <div class="hint" style="margin-bottom:8px;">提问范围：当前对比的 ${STATE.data?STATE.data.companies.length:0} 家公司（${comps}）</div>
+  <div class="chat" id="qaChat"></div>
+  <div class="chat-controls">
+    <textarea id="qaQuestion" placeholder="基于当前对比数据和已传年报随便问，比如：紫金矿业的资产负债率为何上升？三家公司里谁现金流最健康？商誉有没有减值风险？"></textarea>
+  </div>
+  <div class="row" style="margin-top:8px;">
+    <button class="primary" id="qaAsk">发送</button>
+    <button id="qaClearChat">清空对话</button>
+    <span id="qaStatus" class="hint" style="align-self:center;"></span>
+  </div>
+  <div class="err" id="qaErr"></div>`;
+}
+function setupEmbeddedQA(){
+  const askBtn=document.getElementById('qaAsk'); if(!askBtn) return;
+  askBtn.onclick=qaAskEmbedded;
+  document.getElementById('qaClearChat').onclick=()=>{ QA_HISTORY=[]; const c=document.getElementById('qaChat'); if(c) c.innerHTML=''; };
+  const q=document.getElementById('qaQuestion');
+  q.addEventListener('keydown', e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); qaAskEmbedded(); } });
+  // 拉取当前供应商/模型，动态显示
+  try{
+    fetch('/api/qa/config').then(r=>r.json()).then(j=>{
+      const tag=document.getElementById('qaModelTag');
+      if(tag) tag.textContent = (j.provider==='tokenhub'?'腾讯 TokenHub · ':'') + (j.model||'');
+      QA_MODEL = j.model||'';
+    }).catch(()=>{ const t=document.getElementById('qaModelTag'); if(t) t.textContent='—'; });
+  }catch(e){}
+}
+function qaShowErr(m){ const e=document.getElementById('qaErr'); if(e){ e.textContent=m; e.classList.add('show'); } }
+function addQABubble(role, text){
+  const c=document.getElementById('qaChat'); if(!c) return null;
+  const d=document.createElement('div'); d.className='bubble '+role; d.textContent=text; c.appendChild(d); c.scrollTop=c.scrollHeight; return d;
+}
+function buildMetricsContext(){
+  const data=STATE.data; if(!data) return '';
+  const years=data.years, comps=data.companies;
+  let out='';
+  for(const [tn, rows] of Object.entries(data.tables)){
+    out+='\n【'+tn+'】\n';
+    rows.forEach(r=>{
+      const parts=years.map(y=>{
+        const vs=comps.map(c=>{ const v=r.values[c.name]&&r.values[c.name][y]; return c.name+':'+(v==null?'—':fmt(v)); }).join(' ');
+        return y+' '+vs;
+      });
+      out+='· '+r.name+'：'+parts.join('；')+'\n';
+    });
+  }
+  return out;
+}
+function qaAskEmbedded(){
+  const qEl=document.getElementById('qaQuestion'); const q=qEl.value.trim();
+  if(!q){ qaShowErr('请输入问题'); return; }
+  if(!STATE.data||!STATE.data.companies.length){ qaShowErr('请先生成对比'); return; }
+  const companies=STATE.data.companies.map(c=>c.name);
+  qaShowErr('');
+  addQABubble('user', q);
+  QA_HISTORY.push({role:'user', content:q});
+  qEl.value='';
+  const askBtn=document.getElementById('qaAsk'); askBtn.disabled=true;
+  const ansEl=addQABubble('assistant','');
+  const status=document.getElementById('qaStatus'); status.innerHTML='<span class="spinner"></span>'+(QA_MODEL||'AI')+' 思考中…';
+  let full='', sources=null;
+  const body={ companies, question:q, history:QA_HISTORY.slice(0,-1), metrics:buildMetricsContext() };
+  fetch('/api/qa/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  .then(r=>{
+    if(!(r.headers.get('content-type')||'').includes('ndjson')){ return r.json().then(j=>{ throw new Error(j.error||'请求失败'); }); }
+    const reader=r.body.getReader(); const dec=new TextDecoder(); let buf='';
+    function pump(){ return reader.read().then(({done,value})=>{
+      if(done) return;
+      buf+=dec.decode(value,{stream:true});
+      let idx; while((idx=buf.indexOf('\n'))>=0){ const line=buf.slice(0,idx); buf=buf.slice(idx+1); if(!line.trim()) continue;
+        const evt=JSON.parse(line);
+        if(evt.type==='sources') sources=evt.data;
+        else if(evt.type==='delta'){ full+=evt.data; ansEl.textContent=full; const c=document.getElementById('qaChat'); if(c) c.scrollTop=c.scrollHeight; }
+        else if(evt.type==='error'){ qaShowErr('AI 报错：'+evt.data); }
+      }
+      return pump();
+    }); }
+    return pump();
+  })
+  .then(()=>{
+    if(sources&&sources.length){
+      const sHtml='<div class="hint" style="margin-top:8px;">参考段落（来自你上传的年报）：</div>'+
+        sources.map(s=>`<div class="src"><b>${s.company} 第 ${s.page} 页</b><br>${s.text.replace(/</g,'&lt;').slice(0,240)}</div>`).join('');
+      const sd=document.createElement('div'); sd.innerHTML=sHtml; if(ansEl) ansEl.appendChild(sd);
+    }
+    if(full) QA_HISTORY.push({role:'assistant', content:full});
+  })
+  .catch(e=>{ qaShowErr('提问失败：'+e.message); })
+  .finally(()=>{ askBtn.disabled=false; status.textContent=''; });
+}
+
+// ---------- 绑定 & 启动 ----------
+document.getElementById('btnClearSel').onclick=clearAll;
+loadState();
+</script>
+</body>
+</html>
