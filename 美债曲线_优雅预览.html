@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>美债收益率曲线 · 优雅样式预览</title>
+<script src="static/vendor/chart.umd.min.js"></script>
+<script src="static/vendor/chartjs-plugin-zoom.min.js"></script>
+<style>
+  :root{--bg:#fff;--bg2:#f7f8fa;--line:#e6e8eb;--muted:#6b7280;--ink:#1f2329;--brand:#185fa5;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg2);font-size:14px;}
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 20px 60px;}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+  .row{display:flex;justify-content:space-between;align-items:center;}
+  button{cursor:pointer;padding:8px 14px;border:1px solid var(--line);background:var(--bg);border-radius:8px;font-size:14px;}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .muted{color:var(--muted);font-size:12px;}
+  .chart-box{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);}
+  .tag{display:inline-block;font-size:12px;color:var(--brand);background:#e6f1fb;border-radius:6px;padding:2px 8px;margin-left:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="row" style="align-items:center">
+      <div><b>美债收益率曲线 <span class="tag">预览（样例数据）</span></b> <span class="muted">（2年 / 5年 / 10年 / 30年，近10年·每周）</span></div>
+      <button id="btnResetZoom" class="primary">重置缩放</button>
+    </div>
+    <div class="muted" style="margin:6px 0 2px">在图上按住鼠标左键<b>横向拖拽框选一段区间</b>即可放大查看细节；按住 <b>Ctrl</b> 拖拽可平移；<b>双击</b>或点「重置缩放」恢复全图。</div>
+    <div class="chart-box" style="margin-top:6px"><canvas id="curveChart" height="90"></canvas></div>
+  </div>
+
+  <div class="card">
+    <b>这次改了什么</b>
+    <ul class="muted" style="line-height:1.8;margin:8px 0 0">
+      <li>线宽从默认 3px 降到 <b>1.8px</b>，圆角线帽，更纤细利落；</li>
+      <li>去掉了每周一个的实心数据点（密密麻麻显粗），只在鼠标悬停时显示单点；</li>
+      <li>网格改为极浅灰、去掉坐标轴边框，图例改底部“线型”样式；</li>
+      <li>悬停时竖向定位，一次看四期限数值，并按高低自动排序；</li>
+      <li><b>新增鼠标框选缩放</b>：拖一道横框放大该时间段，Ctrl 拖拽平移，双击/按钮复位。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+try { const ZP = window.ChartZoom; if (ZP && !Chart.registry.plugins.get('zoom')) Chart.register(ZP); } catch(e){}
+
+// ---- 生成近 10 年（520 周）样例周线数据，模拟真实形态（含一段倒挂）----
+function genDates(){
+  const out=[]; const d=new Date('2016-07-01');
+  for(let i=0;i<520;i++){ out.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+7); }
+  return out;
+}
+function walk(start, vol, drift){
+  const out=[]; let v=start;
+  for(let i=0;i<520;i++){ v += (Math.random()-0.5)*vol + drift; out.push(Math.max(0.05, +v.toFixed(3))); }
+  return out;
+}
+const dates = genDates();
+// 2022-2023 附近人为制造 2Y>10Y 的倒挂段，让曲线更真实
+const s2 = walk(0.8, 0.12, 0.004);   // 2Y
+const s5 = walk(1.4, 0.13, 0.003);   // 5Y
+const s10= walk(2.0, 0.14, 0.002);   // 10Y
+const s30= walk(2.6, 0.15, 0.001);   // 30Y
+for(let i=300;i<380;i++){ if(s2[i] < s10[i]){ const t=s2[i]; s2[i]=s10[i]+0.15; s10[i]=t; } }
+
+const curve = { dates, series: { '2Y':s2, '5Y':s5, '10Y':s10, '30Y':s30 } };
+
+let curveChart=null;
+function drawCurve(curve){
+  const ctx=document.getElementById('curveChart');
+  const palette={ '2Y':'#3b7dd8','5Y':'#2f9e7a','10Y':'#e0892b','30Y':'#9376e0' };
+  const ds=Object.keys(curve.series).map(k=>({
+    label:k+' 国债', borderColor:palette[k]||'#888', backgroundColor:palette[k]||'#888',
+    borderWidth:1.8, borderCapStyle:'round', borderJoinStyle:'round', tension:0.3,
+    pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:palette[k]||'#888',
+    data:curve.series[k]
+  }));
+  if(curveChart) curveChart.destroy();
+  curveChart=new Chart(ctx,{type:'line',data:{labels:curve.dates,datasets:ds},
+    options:{
+      responsive:true, interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'line',boxWidth:28,padding:16,font:{size:12,weight:'500'}}},
+        tooltip:{callbacks:{title:items=>items[0].label}, filter:(item)=>item.parsed.y!=null, itemSort:(a,b)=>b.parsed.y-a.parsed.y},
+        zoom:{ zoom:{ wheel:{enabled:false}, pinch:{enabled:true},
+            drag:{enabled:true, backgroundColor:'rgba(59,125,216,0.10)', borderColor:'rgba(59,125,216,0.55)', borderWidth:1, drawTime:'beforeDraw'},
+            mode:'x' },
+          pan:{enabled:true, mode:'x', modifierKey:'ctrl'}, limits:{ x:{minRange:24} } }
+      },
+      scales:{
+        y:{ticks:{callback:v=>v+'%',font:{size:11},color:'#9aa0a6'}, grid:{color:'rgba(0,0,0,0.05)'},border:{display:false}},
+        x:{ticks:{autoSkip:true,maxTicksLimit:80,maxRotation:0,font:{size:11},color:'#9aa0a6',
+            callback:function(value,index){ const d=curve.dates[index]; if(!d) return ''; const ym=d.slice(0,7);
+              if(index===0) return ym; const prev=curve.dates[index-1].slice(0,7); return ym!==prev ? ym : ''; }},
+          grid:{display:false},border:{display:false}}
+      }
+    }});
+}
+drawCurve(curve);
+document.getElementById('btnResetZoom').onclick=()=>{ if(curveChart) curveChart.resetZoom(); };
+document.getElementById('curveChart').addEventListener('dblclick',()=>{ if(curveChart) curveChart.resetZoom(); });
+</script>
+</body>
+</html>
