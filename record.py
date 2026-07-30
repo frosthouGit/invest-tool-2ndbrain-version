@@ -14,6 +14,8 @@ import pandas as pd
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'invest.db')
 STOCK_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'stock_cache.json')
 HK_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hk_stock_cache.json')
+MACRO_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'macro_cache.json')
+MACRO_SCHEMA = 2  # 缓存结构版本；改动历史窗口/结构时 +1，旧缓存自动作废并重新联网
 
 # ---------- 初始化 ----------
 def _conn():
@@ -278,17 +280,55 @@ INDICATORS = [
      'src': 'macro_usa_ism_pmi', 'date_col': '日期', 'val_col': '今值'},
 ]
 
-_macro_cache = {'indicators': (0, None), 'curve': (0, None)}
-_macro_hist_cache = {}  # key -> (timestamp, data)
-_MACRO_TTL = 30 * 60  # 30 分钟
-
 def _fetch_bond():
     return ak.bond_zh_us_rate()
 
-def get_macro_indicators():
-    ts, data = _macro_cache['indicators']
-    if data is not None and time.time() - ts < _MACRO_TTL:
-        return data
+def get_macro_indicators(force=False):
+    """返回 20 个宏观指标最新值。force=False 时优先读本地缓存（零联网）。"""
+    mc = _mc_load()
+    if not force and mc.get('indicators'):
+        return mc['indicators']
+    out = _fetch_indicators()
+    # 若全部拉取失败（如离线），不写缓存，避免污染本地；下次仍会尝试联网
+    if any(it.get('value') is not None for it in out):
+        mc['indicators'] = out
+        _mc_save()
+    return out
+
+def _ind_meta(ind):
+    return {'key': ind['key'], 'region': ind['region'], 'name': ind['name'], 'unit': ind['unit']}
+
+# ---------- 宏观数据本地持久缓存 ----------
+# 历史数据（固定不变）与最新值都落盘到项目目录的 macro_cache.json。
+# 首次联网加载后永久本地保存；平时读取零联网，仅“刷新数据”时联网更新最新值。
+def _mc_load():
+    global _mc
+    if _mc is None:
+        try:
+            with open(MACRO_CACHE_PATH, encoding='utf-8') as f:
+                _mc = json.load(f)
+        except Exception:
+            _mc = {}
+        # 旧缓存（如历史窗口为 10 年）作废，本次访问会重新联网并写入新结构
+        if _mc.get('schema') != MACRO_SCHEMA:
+            _mc = {}
+    return _mc
+
+def _mc_save():
+    global _mc
+    if _mc is None:
+        return
+    try:
+        _mc['schema'] = MACRO_SCHEMA   # 写入结构版本，便于后续升级时自动失效
+        tmp = MACRO_CACHE_PATH + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(_mc, f, ensure_ascii=False)
+        os.replace(tmp, MACRO_CACHE_PATH)   # 原子写，避免半截文件
+    except Exception:
+        pass
+
+def _fetch_indicators():
+    """联网拉取 20 个宏观指标最新值（内部函数，不含缓存）"""
     out = []
     bond_df = None
     for ind in INDICATORS:
@@ -309,7 +349,6 @@ def get_macro_indicators():
             sub = df[[ind['date_col'], ind['val_col']]].dropna(subset=[ind['val_col']])
             if len(sub) == 0:
                 out.append({**_ind_meta(ind), 'value': None, 'date': None}); continue
-            # 各接口排序方向不一致，统一按日期列升序后再取最新
             sub = sub.sort_values(ind['date_col'], na_position='last')
             last = sub.iloc[-1]
             try:
@@ -319,24 +358,16 @@ def get_macro_indicators():
             out.append({**_ind_meta(ind), 'value': val, 'date': str(last[ind['date_col']])})
         except Exception as e:
             out.append({**_ind_meta(ind), 'value': None, 'date': None, 'error': str(e)})
-    _macro_cache['indicators'] = (time.time(), out)
     return out
 
-def _ind_meta(ind):
-    return {'key': ind['key'], 'region': ind['region'], 'name': ind['name'], 'unit': ind['unit']}
-
-def get_treasury_curve():
-    ts, data = _macro_cache['curve']
-    if data is not None and time.time() - ts < _MACRO_TTL:
-        return data
+def _fetch_curve():
+    """联网拉取美债收益率曲线（内部函数，不含缓存）"""
     df = _fetch_bond()
     df = df.dropna(subset=['美国国债收益率10年'])
     df['日期'] = pd.to_datetime(df['日期'], errors='coerce')
     df = df.dropna(subset=['日期']).sort_values('日期')
-    # 仅取近 10 年
-    cutoff = pd.Timestamp.today() - pd.DateOffset(years=10)
+    cutoff = pd.Timestamp.today() - pd.DateOffset(years=30)
     df = df[df['日期'] >= cutoff]
-    # 周线：取每周最后一条（周五），避免每日数据过密
     df = df.set_index('日期').resample('W').last().dropna(subset=['美国国债收益率10年']).reset_index()
     dates = [d.strftime('%Y-%m-%d') for d in df['日期']]
     series = {}
@@ -344,20 +375,70 @@ def get_treasury_curve():
                        ('10Y', '美国国债收益率10年'), ('30Y', '美国国债收益率30年')]:
         if col in df.columns:
             series[tenor] = [None if pd.isna(v) else round(float(v), 3) for v in df[col]]
-    data = {'dates': dates, 'series': series}
-    _macro_cache['curve'] = (time.time(), data)
+    return {'dates': dates, 'series': series}
+
+def _fetch_history(key):
+    """联网拉取单个指标近30年周线历史（内部函数，不含缓存）"""
+    ind = next((i for i in INDICATORS if i['key'] == key), None)
+    if not ind:
+        return {'key': key, 'error': 'unknown indicator', 'dates': [], 'series': []}
+    try:
+        if key == 'us_cpi':
+            cdates, cseries = _usa_cpi_yoy_series()
+            s = pd.Series(cseries, index=pd.to_datetime(cdates)).dropna()
+            cutoff = pd.Timestamp.today() - pd.DateOffset(years=30)
+            s = s[s.index >= cutoff]
+            s = s.resample('W').last().dropna()
+            dates = [d.strftime('%Y-%m-%d') for d in s.index]
+            series = [None if pd.isna(v) else round(float(v), 4) for v in s.values]
+            data = {'key': key, 'name': ind['region'] + '·' + ind['name'],
+                    'unit': ind['unit'], 'dates': dates, 'series': series}
+        else:
+            if ind['src'] == 'bond_zh_us_rate':
+                df = _fetch_bond()
+            else:
+                df = getattr(ak, ind['src'])()
+            sub = df[[ind['date_col'], ind['val_col']]].dropna(subset=[ind['val_col']]).copy()
+            sub[ind['date_col']] = sub[ind['date_col']].apply(_parse_macro_date)
+            sub = sub.dropna(subset=[ind['date_col']]).sort_values(ind['date_col'])
+            cutoff = pd.Timestamp.today() - pd.DateOffset(years=30)
+            sub = sub[sub[ind['date_col']] >= cutoff]
+            sub = sub.set_index(ind['date_col']).resample('W').last().dropna(subset=[ind['val_col']]).reset_index()
+            dates = [d.strftime('%Y-%m-%d') for d in sub[ind['date_col']]]
+            series = [None if pd.isna(v) else round(float(v), 4) for v in sub[ind['val_col']]]
+            data = {'key': key, 'name': ind['region'] + '·' + ind['name'],
+                    'unit': ind['unit'], 'dates': dates, 'series': series}
+    except Exception as e:
+        data = {'key': key, 'name': ind['region'] + '·' + ind['name'],
+                'unit': ind['unit'], 'error': str(e), 'dates': [], 'series': []}
+    return data
+
+_mc = None  # 内存镜像（进程内加速），首次 _mc_load 时从磁盘载入
+
+def get_treasury_curve(force=False):
+    """返回美债收益率曲线。force=False 时优先读本地缓存（零联网）。"""
+    mc = _mc_load()
+    if not force and mc.get('curve'):
+        return mc['curve']
+    data = _fetch_curve()
+    if data.get('series'):   # 至少有一条期限序列才算成功
+        mc['curve'] = data
+        _mc_save()
     return data
 
 def refresh_macro():
-    _macro_cache['indicators'] = (0, None)
-    _macro_cache['curve'] = (0, None)
-    _macro_hist_cache.clear()
-    # 立即拉取一次，触发缓存
-    get_macro_indicators()
-    get_treasury_curve()
+    """联网刷新最新值 + 曲线（历史固定不再重复下载）；本地缺失的历史补拉一次。"""
+    get_macro_indicators(force=True)
+    get_treasury_curve(force=True)
+    mc = _mc_load()
+    hist = mc.setdefault('histories', {})
+    for ind in INDICATORS:
+        if ind['key'] not in hist:
+            hist[ind['key']] = _fetch_history(ind['key'])
+    _mc_save()
     return True
 
-# ---------- 单个指标近 10 年周线历史 ----------
+# ---------- 单个指标近 30 年周线历史 ----------
 def _parse_macro_date(s):
     """把 AkShare 宏观接口的中文日期解析成 Timestamp。
     GDP：'2026年第1季度' / '2026年第1-2季度' -> 季度末
@@ -403,47 +484,16 @@ def _usa_cpi_yoy_series():
     series = [round(float(v), 4) for v in yoy.values]
     return dates, series
 
-def get_indicator_history(key):
-    """单个指标近 10 年、周线（每周取最后一条）、X 轴按月份标注所需的数据。
-    返回 {key,name,unit,dates:[...],series:[...]}；失败返回 {error,...}。"""
-    ind = next((i for i in INDICATORS if i['key'] == key), None)
-    if not ind:
-        return {'key': key, 'error': 'unknown indicator', 'dates': [], 'series': []}
-    if key in _macro_hist_cache:
-        ts, data = _macro_hist_cache[key]
-        if time.time() - ts < _MACRO_TTL:
-            return data
-    try:
-        if key == 'us_cpi':
-            cdates, cseries = _usa_cpi_yoy_series()
-            s = pd.Series(cseries, index=pd.to_datetime(cdates)).dropna()
-            cutoff = pd.Timestamp.today() - pd.DateOffset(years=10)
-            s = s[s.index >= cutoff]
-            s = s.resample('W').last().dropna()
-            dates = [d.strftime('%Y-%m-%d') for d in s.index]
-            series = [None if pd.isna(v) else round(float(v), 4) for v in s.values]
-            data = {'key': key, 'name': ind['region'] + '·' + ind['name'],
-                    'unit': ind['unit'], 'dates': dates, 'series': series}
-        elif ind['src'] == 'bond_zh_us_rate':
-            df = _fetch_bond()
-        else:
-            df = getattr(ak, ind['src'])()
-        if key != 'us_cpi':
-            sub = df[[ind['date_col'], ind['val_col']]].dropna(subset=[ind['val_col']]).copy()
-            sub[ind['date_col']] = sub[ind['date_col']].apply(_parse_macro_date)
-            sub = sub.dropna(subset=[ind['date_col']]).sort_values(ind['date_col'])
-            cutoff = pd.Timestamp.today() - pd.DateOffset(years=10)
-            sub = sub[sub[ind['date_col']] >= cutoff]
-            # 周线：每周取最后一条（季度/月度数据前移填充，形成阶梯线）
-            sub = sub.set_index(ind['date_col']).resample('W').last().dropna(subset=[ind['val_col']]).reset_index()
-            dates = [d.strftime('%Y-%m-%d') for d in sub[ind['date_col']]]
-            series = [None if pd.isna(v) else round(float(v), 4) for v in sub[ind['val_col']]]
-            data = {'key': key, 'name': ind['region'] + '·' + ind['name'],
-                    'unit': ind['unit'], 'dates': dates, 'series': series}
-    except Exception as e:
-        data = {'key': key, 'name': ind['region'] + '·' + ind['name'],
-                'unit': ind['unit'], 'error': str(e), 'dates': [], 'series': []}
-    _macro_hist_cache[key] = (time.time(), data)
+def get_indicator_history(key, force=False):
+    """返回单个指标近30年周线历史。force=False 时优先读本地缓存（零联网）。"""
+    mc = _mc_load()
+    hist = mc.setdefault('histories', {})
+    if not force and key in hist:
+        return hist[key]
+    data = _fetch_history(key)
+    if not data.get('error'):   # 拉取失败不写缓存，避免污染
+        hist[key] = data
+        _mc_save()
     return data
 
 init_db()

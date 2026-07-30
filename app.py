@@ -5,7 +5,15 @@ import json as _json
 import openpyxl
 from data import get_peers, get_comparison, build_excel
 import record as rec
-import qa as qa_mod
+# AI 问答模块依赖 pdfplumber/jieba/rank_bm25 等，拷贝到别的电脑若漏装这些包，
+# 不应连累公司分析/选股/记录等核心功能。因此这里做成“可失败”：导入失败则置为 None，
+# 由下方 _guard_qa_routes 在访问 AI 问答相关路由时给出友好提示。
+_qa_import_error = None
+try:
+    import qa as qa_mod
+except Exception as _qa_imp_err:
+    qa_mod = None
+    _qa_import_error = _qa_imp_err
 import sys, time, threading, subprocess, webbrowser, re
 
 app = Flask(__name__)
@@ -20,6 +28,21 @@ def _no_cache(resp):
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
+
+
+@app.before_request
+def _guard_qa_routes():
+    """当 AI 问答模块（qa）未能加载时，拦截其相关路由，返回友好提示，
+    而不是让核心功能跟着崩。公司分析/选股/记录等路由不受影响。"""
+    if qa_mod is None and (request.path == '/qa' or request.path.startswith('/api/qa')):
+        if request.path == '/qa':
+            return ('<html><body style="font-family:sans-serif;padding:40px;max-width:640px">'
+                    '<h2>AI 问答模块未加载</h2>'
+                    '<p>缺少 pdfplumber / jieba / rank_bm25 等依赖，AI 问答功能暂不可用。</p>'
+                    '<p>公司分析、选股、记录功能不受影响，可正常使用。</p>'
+                    '<p style="color:#888">缺失原因：%s</p>'
+                    '</body></html>' % _qa_import_error), 503
+        return jsonify(error='AI 问答模块未加载（缺少依赖，公司分析/选股/记录不受影响）'), 503
 
 
 VAL_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'valuation_cache.json')

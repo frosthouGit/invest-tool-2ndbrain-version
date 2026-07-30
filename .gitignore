@@ -34,3 +34,9 @@ run.log
 .DS_Store
 Thumbs.db
 *.swp
+
+# ---- 本次补充排除（临时 / 可重生 / 错误日志，避免误传）----
+*.err
+server.err
+macro_cache.json
+cmp.json
