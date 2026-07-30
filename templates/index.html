@@ -75,6 +75,7 @@
   .ac-item:hover,.ac-item.active{background:var(--brand2);}
   .ac-item .code{color:var(--muted);font-size:12px;}
   .ai-note{border:1px solid #f0d9a8;background:#fff8ec;color:#8a5a00;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:14px;}
+  .rnote{font-size:11px;color:#8a8f99;font-weight:400;margin-top:3px;line-height:1.4;white-space:normal;max-width:340px;}
   .chat{display:flex;flex-direction:column;gap:10px;margin-top:6px;max-height:440px;overflow:auto;padding-right:4px;}
   .bubble{border-radius:12px;padding:10px 12px;max-width:92%;line-height:1.7;font-size:14px;white-space:pre-wrap;word-break:break-word;}
   .bubble.user{align-self:flex-end;background:var(--brand);color:#fff;}
@@ -404,7 +405,8 @@ function buildTable(title, rows){
     let b='<tbody>';
     rs.forEach(r=>{
       const trc = r.is_total ? ' class="total-row"' : '';
-      b+='<tr'+trc+'><td class="rowname">'+r.name+'</td>';
+      const noteHtml = r.note ? '<div class="rnote" title="'+r.note+'">'+r.note+'</div>' : '';
+      b+='<tr'+trc+'><td class="rowname">'+r.name+noteHtml+'</td>';
       years.forEach(y=>{
         comps.forEach((c,i)=>{
           const v=(r.values[c.name]&&r.values[c.name][y]);

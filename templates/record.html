@@ -82,7 +82,7 @@
   <div class="panel active" id="panel-macro">
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <div><b>中美国宏观指标</b> <span class="muted">（数据自动取自东方财富，可手动刷新）</span></div>
+        <div><b>中美国宏观指标</b> <span class="muted">（首次联网加载后本地保存，平时零下载；点「刷新数据」才重新联网更新）</span></div>
         <button class="primary" id="btnRefresh">刷新数据</button>
       </div>
       <div class="toggles" id="indToggles"></div>
@@ -90,7 +90,7 @@
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center">
-        <div><b>美债收益率曲线</b> <span class="muted">（2年 / 5年 / 10年 / 30年，近10年·每周）</span></div>
+        <div><b>美债收益率曲线</b> <span class="muted">（2年 / 5年 / 10年 / 30年，近30年·每周）</span></div>
         <button id="btnResetZoom">重置缩放</button>
       </div>
       <div class="muted" style="margin:6px 0 2px">在图上按住鼠标左键<b>横向拖拽框选一段区间</b>即可放大查看细节；按住 <b>Ctrl</b> 拖拽可平移；<b>双击</b>或点「重置缩放」恢复全图。</div>
@@ -144,10 +144,10 @@
   </div>
 </div>
 
-<!-- 指标近10年走势 模态框 -->
+<!-- 指标近30年走势 模态框 -->
 <div class="modal-mask" id="histMask">
   <div class="modal">
-    <div class="modal-head"><span id="histTitle"></span><span class="modal-x" id="histClose">×</span></div>
+    <div class="modal-head"><span id="histTitle"></span><span style="display:flex;gap:10px;align-items:center"><button id="histReset" style="padding:3px 10px;font-size:12px">重置缩放</button><span class="modal-x" id="histClose">×</span></span></div>
     <div class="chart-box" style="margin-top:10px"><canvas id="histChart" height="130"></canvas></div>
     <div class="muted" id="histNote" style="margin-top:8px"></div>
   </div>
@@ -156,7 +156,6 @@
 <script>
 const fmt = v => (v==null?'—':(Math.abs(v)>=1e8?(v/1e8).toFixed(2)+'亿':(Number.isInteger(v)?v.toLocaleString():v.toLocaleString())));
 const fmt2 = v => (v==null?'—':Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
-const fmtPct = v => (v==null?'—':((v>=0?'+':'')+v.toFixed(2)+'%'));
 const cls = v => (v==null?'':(v>=0?'pos':'neg'));
 
 // 注册框选缩放插件（UMD 版通常会自动注册，这里做个安全兜底）
@@ -251,15 +250,22 @@ function renderCards(){
     const d=document.createElement('div'); d.className='ic clickable';
     d.innerHTML='<div class="rg">'+m.region+'</div><div class="nm">'+m.name+'</div>'+
       '<div class="vl">'+fmt2(m.value)+(m.unit&&m.value!=null?'<span style="font-size:13px">'+m.unit+'</span>':'')+'</div>'+
-      '<div class="dt">'+(m.date||'')+'</div><div class="hint">点击看近10年走势 ›</div>';
+      '<div class="dt">'+(m.date||'')+'</div><div class="hint">点击看近30年走势 ›</div>';
     d.onclick=()=>openHistory(m.key, m.region+'·'+m.name);
     box.appendChild(d);
   });
 }
+function fmtPct(v){
+  if(v==null || isNaN(v)) return '';
+  const r=Math.round(v*100)/100;            // 四舍五入到2位小数
+  return Number(r.toFixed(2)) + '%';         // 去掉多余尾零，最多2位
+}
+
 function drawCurve(curve){
   const ctx=document.getElementById('curveChart');
   // 柔和但区分度高的配色
   const palette={ '2Y':'#3b7dd8','5Y':'#2f9e7a','10Y':'#e0892b','30Y':'#9376e0' };
+  const n=curve.dates.length;
   const ds=Object.keys(curve.series).map(k=>({
     label:k+' 国债',
     borderColor:palette[k]||'#888',
@@ -271,38 +277,42 @@ function drawCurve(curve){
     pointRadius:0,              // 去掉密密麻麻的数据点
     pointHoverRadius:4,
     pointHoverBackgroundColor:palette[k]||'#888',
-    data:curve.series[k]
+    data:curve.series[k].map((v,i)=>({x:i,y:v}))   // 线性索引，缩放连续可靠
   }));
   if(curveChart) curveChart.destroy();
-  curveChart=new Chart(ctx,{type:'line',data:{labels:curve.dates,datasets:ds},
+  curveChart=new Chart(ctx,{type:'line',data:{datasets:ds},
     options:{
       responsive:true,
       interaction:{mode:'index',intersect:false},   // 竖向十字定位，一次看四期限
       plugins:{
         legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'line',
           boxWidth:28,padding:16,font:{size:12,weight:'500'}}},
-        tooltip:{callbacks:{title:items=>items[0].label},
+        tooltip:{callbacks:{
+          title:items=>{ const i=items[0]&&Math.round(items[0].parsed.x); return (i!=null&&curve.dates[i])?curve.dates[i]:''; },
+          label:item=>`${item.dataset.label}: ${fmtPct(item.parsed.y)}`,
           filter:(item)=>item.parsed.y!=null,
-          itemSort:(a,b)=>b.parsed.y-a.parsed.y},
+          itemSort:(a,b)=>b.parsed.y-a.parsed.y}},
         zoom:{
           zoom:{ wheel:{enabled:false}, pinch:{enabled:true},
             drag:{enabled:true,
               backgroundColor:'rgba(59,125,216,0.10)',
               borderColor:'rgba(59,125,216,0.55)', borderWidth:1, drawTime:'beforeDraw'},
-            mode:'x' },
-          pan:{enabled:true, mode:'x', modifierKey:'ctrl'},
+            mode:'xy' },                     // 框选同时缩放横纵，横坐标必跟随
+          pan:{enabled:true, mode:'xy', modifierKey:'ctrl'},
           limits:{ x:{minRange:24} }   // 最多放大到约24周，避免缩成一条线
         }
       },
       scales:{
-        y:{ticks:{callback:v=>v+'%',font:{size:11},color:'#9aa0a6'},
+        y:{ticks:{callback:v=>fmtPct(v),font:{size:11},color:'#9aa0a6'},
            grid:{color:'rgba(0,0,0,0.05)'},border:{display:false}},
-        x:{ticks:{autoSkip:true,maxTicksLimit:80,maxRotation:0,font:{size:11},color:'#9aa0a6',
-          callback:function(value,index){
-            const d=curve.dates[index]; if(!d) return '';
+        x:{type:'linear', min:0, max:n-1,    // 线性轴：缩放时横坐标严格跟随
+          ticks:{autoSkip:true,maxTicksLimit:80,maxRotation:0,font:{size:11},color:'#9aa0a6',
+          callback:function(value){
+            const i=Math.round(value); if(i<0||i>=n) return '';
+            const d=curve.dates[i]; if(!d) return '';
             const ym=d.slice(0,7);
-            if(index===0) return ym;
-            const prev=curve.dates[index-1].slice(0,7);
+            if(i===0) return ym;
+            const prev=curve.dates[i-1].slice(0,7);
             return ym!==prev ? ym : '';
           }},
           grid:{display:false},border:{display:false}}
@@ -379,42 +389,59 @@ setupStockAc('w_name','ac_watch', it=>{ document.getElementById('w_code').value 
   if(it && it.market) document.getElementById('w_market').value = it.market; });
 setupStockAc('p_stock','ac_plan', it=>{ document.getElementById('p_code').value = it? it.code : ''; });
 
-// ---------- 指标近10年走势（模态框） ----------
+// ---------- 指标近30年走势（模态框） ----------
 let histChart=null;
 function openHistory(key, name){
-  document.getElementById('histTitle').textContent = name + ' · 近10年（周线）';
+  document.getElementById('histTitle').textContent = name + ' · 近30年（周线）';
   document.getElementById('histNote').textContent = '加载中…';
   document.getElementById('histMask').classList.add('show');
   fetch('/api/macro/history?key='+encodeURIComponent(key)).then(r=>r.json()).then(h=>{
     const note = document.getElementById('histNote');
     if(h.error){ note.textContent='加载失败：'+h.error; return; }
     const n = h.series.filter(v=>v!=null).length;
-    note.textContent = '区间 '+(h.dates[0]||'')+' ~ '+(h.dates[h.dates.length-1]||'')+'，共 '+n+' 个数据点（X轴按月份标注）';
+    note.textContent = '区间 '+(h.dates[0]||'')+' ~ '+(h.dates[h.dates.length-1]||'')+'，共 '+n+' 个数据点（X轴按月份标注）。在图上按住左键框选可缩放，双击或点「重置缩放」复位。';
     drawHistory(h);
   });
 }
 function drawHistory(h){
   const ctx=document.getElementById('histChart');
+  const n=h.dates.length;
+  const isPct=(h.unit||'')==='%';
+  const fmtY=v=> (v==null)?'' : (isPct ? fmtPct(v) : (v+(h.unit||'')));
   const ds={label:h.name, borderColor:'#3b7dd8', backgroundColor:'#3b7dd8',
-    tension:0.3, data:h.series, pointRadius:0, borderWidth:1.6,
+    tension:0.3, data:h.series.map((v,i)=>({x:i,y:v})), pointRadius:0, borderWidth:1.6,
     borderCapStyle:'round', borderJoinStyle:'round'};
   if(histChart) histChart.destroy();
-  histChart=new Chart(ctx,{type:'line', data:{labels:h.dates, datasets:[ds]},
+  histChart=new Chart(ctx,{type:'line', data:{datasets:[ds]},
     options:{responsive:true, interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'bottom'},
-        tooltip:{callbacks:{title:items=>items[0].label}}},
-      scales:{y:{ticks:{callback:v=>v+(h.unit||''),font:{size:11},color:'#9aa0a6'},grid:{color:'rgba(0,0,0,0.05)'},border:{display:false}},
-        x:{ticks:{autoSkip:true, maxTicksLimit:80, maxRotation:0,font:{size:11},color:'#9aa0a6',
-          callback:function(value,index){
-            const d=h.dates[index]; if(!d) return '';
-            const m=d.slice(0,7);
-            if(index===0) return m;
-            const prev=h.dates[index-1].slice(0,7);
-            return m!==prev ? m : '';
+      plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'line',boxWidth:24,padding:14}},
+        tooltip:{callbacks:{title:items=>{ const i=items[0]&&Math.round(items[0].parsed.x); return (i!=null&&h.dates[i])?h.dates[i]:''; },
+          label:item=>`${item.dataset.label}: ${fmtY(item.parsed.y)}`}},
+        zoom:{
+          zoom:{ wheel:{enabled:false}, pinch:{enabled:true},
+            drag:{enabled:true,
+              backgroundColor:'rgba(59,125,216,0.10)',
+              borderColor:'rgba(59,125,216,0.55)', borderWidth:1, drawTime:'beforeDraw'},
+            mode:'xy' },
+          pan:{enabled:true, mode:'xy', modifierKey:'ctrl'},
+          limits:{ x:{minRange:12} }
+        }},
+      scales:{y:{ticks:{callback:v=>fmtY(v),font:{size:11},color:'#9aa0a6'},grid:{color:'rgba(0,0,0,0.05)'},border:{display:false}},
+        x:{type:'linear', min:0, max:n-1,
+          ticks:{autoSkip:true,maxTicksLimit:80,maxRotation:0,font:{size:11},color:'#9aa0a6',
+          callback:function(value){
+            const i=Math.round(value); if(i<0||i>=n) return '';
+            const d=h.dates[i]; if(!d) return '';
+            const ym=d.slice(0,7);
+            if(i===0) return ym;
+            const prev=h.dates[i-1].slice(0,7);
+            return ym!==prev ? ym : '';
           }},grid:{display:false},border:{display:false}}}}});
 }
 document.getElementById('histClose').onclick=()=>document.getElementById('histMask').classList.remove('show');
 document.getElementById('histMask').onclick=e=>{ if(e.target.id==='histMask') e.currentTarget.classList.remove('show'); };
+document.getElementById('histReset').onclick=()=>{ if(histChart) histChart.resetZoom(); };
+document.getElementById('histChart').addEventListener('dblclick',()=>{ if(histChart) histChart.resetZoom(); });
 
 // 默认加载宏观
 loadMacro();

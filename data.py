@@ -695,6 +695,21 @@ def _indicator_defs():
         a, i, p = ar_days(ib, bb, cb), inv_days(ib, bb, cb), ap_days(ib, bb, cb)
         return None if None in (a, i, p) else a + i - p
 
+    def ar_ap_diff(ib, bb, cb):
+        # 应收合计：所有"应收/预付"类资产（对手方欠公司的钱 + 公司预付/垫款）
+        rece_keys = ('NOTE_RECE', 'ACCOUNTS_RECE', 'NOTE_ACCOUNTS_RECE', 'PREPAYMENT',
+                     'OTHER_RECE', 'DIVIDEND_RECE', 'INTEREST_RECE', 'CONTRACT_ASSET', 'LONG_RECE')
+        # 应付合计：所有"应付/预收"类负债（公司欠对手方的钱 + 客户预付/合同负债 + 各项计提）
+        pay_keys = ('NOTE_PAYABLE', 'ACCOUNTS_PAYABLE', 'ADVANCE_RECEIVABLES', 'CONTRACT_LIAB',
+                    'STAFF_SALARY_PAYABLE', 'TAX_PAYABLE', 'INTEREST_PAYABLE', 'DIVIDEND_PAYABLE',
+                    'OTHER_PAYABLE', 'LONG_PAYABLE')
+        rece = sum((_g(bb, k) or 0) for k in rece_keys)
+        pay = sum((_g(bb, k) or 0) for k in pay_keys)
+        if rece == 0 and pay == 0:
+            return None
+        # 正数：被上下游净占用的营运资金（自有现金被垫住）；负数：更占用供应商/客户资金（对现金更友好）
+        return rece - pay
+
     def rev_abs(ib, bb, cb):
         return _g(ib, 'OPERATE_INCOME')
 
@@ -720,25 +735,39 @@ def _indicator_defs():
 
     groups = [
         ('盈利质量', [
-            ('毛利率(%)', gross), ('净利率(%)', netp), ('营业利润率(%)', opr),
-            ('ROE(%)', roe), ('ROA(%)', roa),
+            ('毛利率(%)', gross, '毛利率 = (营业收入 − 营业成本) ÷ 营业收入 × 100%。反映产品本身的赚钱空间，越高越好。'),
+            ('净利率(%)', netp, '净利率 = 归母净利润 ÷ 营业收入 × 100%。扣除全部费用与税后的真实利润率。'),
+            ('营业利润率(%)', opr, '营业利润率 = 营业利润 ÷ 营业收入 × 100%。仅看主营业务的盈利（不含投资收益、营业外收支）。'),
+            ('ROE(%)', roe, '净资产收益率 = 归母净利润 ÷ 归属于母公司股东权益 × 100%。股东每投 1 元能赚多少，是核心盈利能力指标。'),
+            ('ROA(%)', roa, '总资产收益率 = 归母净利润 ÷ 总资产 × 100%。衡量全部资产（含借来的钱）的整体回报。'),
         ]),
         ('杜邦拆解', [
-            ('净利率(%)', dupont_np), ('总资产周转率(次)', dupont_turn), ('权益乘数(倍)', dupont_eqm),
+            ('净利率(%)', dupont_np, '同「净利率」，杜邦分析把它作为驱动 ROE 的第一个因子（ROE = 净利率 × 总资产周转率 × 权益乘数）。'),
+            ('总资产周转率(次)', dupont_turn, '总资产周转率 = 营业收入 ÷ 期末总资产。资产一年能"转"出几倍收入，越高越会用资产。注：严格杜邦用期初与期末平均总资产，本工具为简化用期末总资产。'),
+            ('权益乘数(倍)', dupont_eqm, '权益乘数 = 总资产 ÷ 归属于母公司股东权益。反映加杠杆倍数，越高=借的钱越多、财务风险越大。'),
         ]),
         ('偿债/资本结构', [
-            ('资产负债率(%)', debt_ratio), ('流动比率(倍)', current_ratio),
-            ('速动比率(倍)', quick_ratio), ('利息保障倍数(倍)', interest_cover),
+            ('资产负债率(%)', debt_ratio, '资产负债率 = 总负债 ÷ 总资产 × 100%。越高=负债占比越大、长期偿债压力越大。'),
+            ('流动比率(倍)', current_ratio, '流动比率 = 流动资产 ÷ 流动负债。衡量 1 年内能否还上短期债，通常 >1 较安全。'),
+            ('速动比率(倍)', quick_ratio, '速动比率 = (流动资产 − 存货) ÷ 流动负债。比流动比率更严，剔除变现慢的存货。'),
+            ('利息保障倍数(倍)', interest_cover, '利息保障倍数 = (利润总额 + 利息费用) ÷ 利息费用。赚的钱够付几倍利息，<1 说明还息有风险。'),
         ]),
         ('运营效率', [
-            ('应收账款周转率(次)', ar_turn), ('存货周转率(次)', inv_turn),
-            ('应付账款周转天数(天)', ap_days), ('现金循环周期(天)', ccc),
+            ('应收账款周转率(次)', ar_turn, '应收账款周转率 = 营业收入 ÷ 应收账款。一年把赊账收回再借出的次数，越高=回款越快。'),
+            ('存货周转率(次)', inv_turn, '存货周转率 = 营业成本 ÷ 存货。一年存货卖空几次，越高=积压越少。'),
+            ('应付账款周转天数(天)', ap_days, '应付天数 = 365 ÷ (营业成本 ÷ 应付账款)。平均花多少天付供应商货款，越长=越占用供应商资金。'),
+            ('现金循环周期(天)', ccc, '现金循环周期 = 应收天数 + 存货天数 − 应付天数。从付钱买料到收回货款的净现金占用天数，越短越省现金。'),
+            ('应收和应付的差额(元)', ar_ap_diff, '应收-应付差额 = 应收合计 − 应付合计（绝对值，单位与财报一致）。应收合计 = 应收票据+应收账款+应收款项融资+预付款项+其他应收款+应收股利+应收利息+合同资产+长期应收款；应付合计 = 应付票据+应付账款+预收款项+合同负债+应付职工薪酬+应交税费+应付利息+应付股利+其他应付款+长期应付款。正数=被上下游净占用的营运资金（自有现金被垫住）；负数=更占用供应商/客户资金（对现金更友好）。'),
         ]),
         ('成长能力', [
-            ('营业收入(元)', rev_abs), ('归母净利润(元)', np_abs), ('总资产(元)', ta_abs),
+            ('营业收入(元)', rev_abs, '利润表"营业总收入"（绝对值，单位元）。规模本身，增长看同比(%)折线。'),
+            ('归母净利润(元)', np_abs, '利润表"归属于母公司股东的净利润"（绝对值）。'),
+            ('总资产(元)', ta_abs, '资产负债表"资产总计"（绝对值）。'),
         ]),
         ('现金流质量', [
-            ('经营现金流/净利润(倍)', ocf_np), ('自由现金流(元)', fcf), ('资本支出占比(%)', capex_ratio),
+            ('经营现金流/净利润(倍)', ocf_np, '经营现金流净额 ÷ 归母净利润。>1 说明赚的是真金白银（利润含金量高），长期 <1 要警惕利润虚。'),
+            ('自由现金流(元)', fcf, '自由现金流 = 经营活动现金流量净额 − 购建长期资产支付的现金。企业真正能自由支配的现金。'),
+            ('资本支出占比(%)', capex_ratio, '资本支出占比 = 购建长期资产支付的现金 ÷ 营业收入 × 100%。扩产/维护投入占收入比重。'),
         ]),
     ]
     return groups
@@ -850,14 +879,14 @@ def get_comparison(companies, years):
         src[comp['name']] = {y: (ib.get(y, {}), bb.get(y, {}), cb.get(y, {})) for y in years_list}
     for gname, defs in groups:
         target = fixed_rows if gname != '杜邦拆解' else dupont_rows
-        for rname, fn in defs:
+        for rname, fn, note in defs:
             vals = {}
             yoyv = {}
             for comp in comp_list:
                 per_year = {y: fn(*src[comp['name']][y]) for y in years_list}
                 vals[comp['name']] = per_year
                 yoyv[comp['name']] = _yoy_from_values(per_year)
-            target.append({'name': rname, 'values': vals, 'yoy': yoyv})
+            target.append({'name': rname, 'values': vals, 'yoy': yoyv, 'note': note, 'group': gname})
     tables['固定指标'] = fixed_rows
     tables['杜邦分析'] = dupont_rows
 
@@ -1033,6 +1062,31 @@ def build_excel(body):
         ws.column_dimensions['A'].width = 26
         for col in range(2, 2 + len(years) * len(companies)):
             ws.column_dimensions[get_column_letter(col)].width = 14
+
+    # 计算说明页：列出固定指标 / 杜邦分析每个指标的计算公式，便于 Excel 自解释
+    note_rows = []
+    for tname in ('固定指标', '杜邦分析'):
+        for r in body['tables'].get(tname, []):
+            if r.get('note'):
+                g = r.get('group') or ('杜邦拆解' if tname == '杜邦分析' else '')
+                note_rows.append((g, r['name'], r['note']))
+    if note_rows:
+        ws = wb.create_sheet(title='计算说明')
+        ws.append(['指标分组', '指标名称', '计算公式 / 说明'])
+        for g, n, note in note_rows:
+            ws.append([g, n, note])
+        ws.cell(1, 1).font = Font(bold=True, size=13, color='0C447C')
+        for ci in (1, 2, 3):
+            ws.cell(1, ci).fill = head_fill
+            ws.cell(1, ci).font = bold_font
+            ws.cell(1, ci).border = border
+        for ri in range(2, 2 + len(note_rows)):
+            for ci in (1, 2, 3):
+                ws.cell(ri, ci).border = border
+            ws.cell(ri, 3).alignment = Alignment(wrap_text=True, vertical='top')
+        ws.column_dimensions['A'].width = 16
+        ws.column_dimensions['B'].width = 22
+        ws.column_dimensions['C'].width = 70
 
     if 'Sheet' in wb.sheetnames:
         del wb['Sheet']
